@@ -122,6 +122,19 @@ src/lol_mode_mcp/
 
 ## 日誌
 
+- **2026-07-09**(session 1 續,Phase 3):Claude Desktop 是
+  **Microsoft Store 版**,設定檔在
+  `%LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\claude_desktop_config.json`
+  (不是 %APPDATA%\Claude),已寫入 mcpServers(uv.exe 絕對路徑)。
+  ⚠️ 踩坑:PS 5.1 的 ConvertFrom-Json 編碼問題會弄壞這個檔,改 JSON 一律用 Python。
+  GitHub repo:https://github.com/NewJeans0722/lol-mode-mcp(已 push)。
+  ⚠️ FastMCP Cloud 首次部署 failed:它以 `fastmcp run 檔案:物件` 方式
+  載入 entrypoint、不會 pip install 本專案,src/ 下的 server.py 相對匯入
+  直接炸。解法:根目錄加部署入口 `server.py`(sys.path 塞 src/ 再
+  re-export `mcp`),**dashboard 的 entrypoint 要填 `server.py:mcp`**。
+  用 `uv run --with fastmcp fastmcp inspect server.py:mcp` 驗證過
+  (fastmcp 3.x runner 可載入官方 SDK 的 FastMCP 物件)。
+
 - **2026-07-09**(session 1):讀 brief → 驗證三個資料源(見上)→
   完成骨架 + 全部 4 tools + resource + 快取/錯誤處理 + 28 tests →
   stdio/HTTP 雙 transport 用真 MCP client 驗證 → 修 3 個迭代問題
