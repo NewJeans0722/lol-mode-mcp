@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "lol-mode-mcp": {
+      "command": "uv",
+      "args": ["run", "--directory", "C:/Users/zhong/Desktop/LOL_MCP", "lol-mode-mcp"]
+    }
+  }
+}

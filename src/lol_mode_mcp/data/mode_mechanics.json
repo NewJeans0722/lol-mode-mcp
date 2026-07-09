@@ -1,0 +1,57 @@
+{
+  "_meta": {
+    "description": "手工校訂的模式機制說明。此檔由專案作者維護,改完直接 push 即可(部署會自動更新)。",
+    "last_reviewed": "2026-07-09",
+    "status": "skeleton — 內容待作者校訂,標 TODO 的段落尚未確認"
+  },
+  "aram": {
+    "name_zh": "嚎哭深淵(ARAM)",
+    "mechanics": [
+      {
+        "topic": "深淵光環(Howling Abyss Aura)",
+        "summary": "TODO: 補上目前版本的光環效果 — 通常包含:回魔加成、死亡計時調整、遠程/近戰的通用補正等,依 patch notes 校訂。",
+        "details": ""
+      },
+      {
+        "topic": "每英雄平衡調整",
+        "summary": "除了全體光環,每個英雄另有個別乘數(造成傷害/承受傷害/治療/護盾/技能急速/攻速/韌性),可用 aram_balance 工具查詢。",
+        "details": "資料源為 LoL Wiki,隨 patch 更新。"
+      },
+      {
+        "topic": "重骰與板凳交換",
+        "summary": "TODO: 說明重骰次數、板凳(bench)交換規則。",
+        "details": ""
+      }
+    ]
+  },
+  "arena": {
+    "name_zh": "競技場(Arena)",
+    "mechanics": [
+      {
+        "topic": "基本規則",
+        "summary": "TODO: 8 隊各 2 人,輪流進行戰鬥回合與購物回合,血量歸零淘汰,最後存活隊伍獲勝 — 依目前版本校訂細節。",
+        "details": ""
+      },
+      {
+        "topic": "海克斯強化(Augments)",
+        "summary": "對局中會多次三選一海克斯強化,稀有度分白銀/黃金/稜彩,另有稜彩道具與鐵砧等特殊獎勵。可用 get_augment / list_augments 工具查詢。",
+        "details": "資料源為 CommunityDragon,隨 patch 更新。"
+      },
+      {
+        "topic": "烈火圈與地圖事件",
+        "summary": "TODO: 縮圈機制與各地圖事件說明。",
+        "details": ""
+      }
+    ]
+  },
+  "aram_mayhem": {
+    "name_zh": "ARAM: Mayhem",
+    "mechanics": [
+      {
+        "topic": "模式概述",
+        "summary": "TODO: 限時模式,ARAM 加上強化系統;有獨立的英雄平衡數值。工具支援規劃中(mayhem_balance 目前為 stub)。",
+        "details": ""
+      }
+    ]
+  }
+}
