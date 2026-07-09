@@ -1,0 +1,15 @@
+# Render 部署藍圖(免費方案)
+# 用法:render.com → New → Blueprint → 選這個 repo,或建 Web Service 時自動套用。
+# Render 會注入 PORT 環境變數,server 的 main() 已支援(綁 0.0.0.0)。
+services:
+  - type: web
+    name: lol-mode-mcp
+    runtime: python
+    plan: free
+    buildCommand: pip install .
+    startCommand: lol-mode-mcp
+    envVars:
+      - key: MCP_TRANSPORT
+        value: streamable-http
+      - key: PYTHON_VERSION
+        value: 3.12.10
