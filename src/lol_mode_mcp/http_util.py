@@ -10,7 +10,7 @@ import httpx
 logger = logging.getLogger(__name__)
 
 # 對外部服務標明身分是禮貌,也是 LoL Wiki(MediaWiki)API 的建議做法
-USER_AGENT = "lol-mode-mcp/0.1 (personal MCP project; github.com/lol-mode-mcp)"
+USER_AGENT = "lol-mode-mcp/0.1 (personal MCP project; github.com/NewJeans0722/lol-mode-mcp)"
 
 TIMEOUT = httpx.Timeout(15.0, connect=10.0)
 

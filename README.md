@@ -53,7 +53,7 @@ uv run lol-mode-mcp                     # 直接啟動(stdio)
 
 ## 部署(FastMCP Cloud)
 
-1. push 到 GitHub
+1. push 到 GitHub([NewJeans0722/lol-mode-mcp](https://github.com/NewJeans0722/lol-mode-mcp))
 2. 在 [FastMCP Cloud](https://fastmcp.cloud) 連結 repo,entrypoint 指向 `src/lol_mode_mcp/server.py` 的 `mcp` 物件
 3. 取得公開網址;之後每次 push 自動重新部署,朋友端不需任何動作
 
