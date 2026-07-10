@@ -9,8 +9,8 @@
 
 - MCP(給 Claude):`https://lol-mode-mcp.onrender.com/mcp`(v0.1.0)
 - 網頁(給人):`https://lol-mode-mcp.onrender.com/`
-  海克斯圖鑑(圖卡+搜尋+稀有度篩選)、競技場平衡(2026-07-10 新增,
-  本機完成待部署)、ARAM 平衡表(可排序)。
+  海克斯圖鑑(圖卡+搜尋+稀有度篩選)、競技場平衡、Patch 改動
+  (後兩者 2026-07-10 新增,已部署驗收)、ARAM 平衡表(可排序)。
   同一個 server 三個出口:`/`、`/api/*`、`/mcp`,
   共用資料層與快取(web.py + server.py 的 custom_route)。
 
