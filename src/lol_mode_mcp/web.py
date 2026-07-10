@@ -249,6 +249,47 @@ async def api_aram(request: Request) -> Response:
     return _cached_json(request, "api_aram", _aram_payload)
 
 
+# ------------------------------------------------------- 背景原畫(官方)
+# 使用者指定的背景英雄;原畫來自 Riot 官方 Data Dragon CDN(和英雄頭像
+# 同一來源)。炫彩(如「泳池狂歡 柔依(焰紅)」)沒有獨立原畫(HEAD 403),
+# 逐一探測後只收有圖的,所以清單會隨官方出新造型自動更新。
+
+BG_CHAMPIONS = ["Zoe", "Briar"]
+_SPLASH_URL = "https://ddragon.leagueoflegends.com/cdn/img/champion/splash/{cid}_{num}.jpg"
+_CHAMP_DETAIL_URL = "https://ddragon.leagueoflegends.com/cdn/{ver}/data/zh_TW/champion/{cid}.json"
+_VERSIONS_URL = "https://ddragon.leagueoflegends.com/api/versions.json"
+
+
+def _backgrounds_payload() -> dict:
+    import httpx
+
+    from .http_util import fetch_json
+    ver = fetch_json(_VERSIONS_URL)[0]
+    champions = []
+    with httpx.Client(timeout=10) as client:
+        for cid in BG_CHAMPIONS:
+            data = fetch_json(_CHAMP_DETAIL_URL.format(ver=ver, cid=cid))["data"][cid]
+            skins = []
+            for s in data["skins"]:
+                url = _SPLASH_URL.format(cid=cid, num=s["num"])
+                try:
+                    if client.head(url).status_code != 200:
+                        continue  # 炫彩無獨立原畫
+                except httpx.HTTPError:
+                    continue
+                name = "經典原畫" if s["name"] == "default" else s["name"]
+                skins.append({"num": s["num"], "name": name, "url": url})
+            champions.append({"id": cid, "name": data["name"], "skins": skins})
+    logger.info("backgrounds loaded: %s",
+                {c["id"]: len(c["skins"]) for c in champions})
+    return {"champions": champions}
+
+
+async def api_backgrounds(request: Request) -> Response:
+    return _cached_json(request, "api_backgrounds", _backgrounds_payload,
+                        ttl=12 * 3600)
+
+
 def warmup() -> None:
     """啟動時在背景把資料源與 API payload 都先算好,訪客不用等。"""
     builders = [("api_augments", _augments_payload),
@@ -259,7 +300,8 @@ def warmup() -> None:
                 ("api_patch_latest_general",
                  lambda: _patch_notes_payload("latest", "general")),
                 ("api_patch_latest_mayhem",
-                 lambda: _patch_notes_payload("latest", "mayhem"))]
+                 lambda: _patch_notes_payload("latest", "mayhem")),
+                ("api_backgrounds", _backgrounds_payload)]
     for key, builder in builders:
         try:
             cache.get_cached(key, builder)

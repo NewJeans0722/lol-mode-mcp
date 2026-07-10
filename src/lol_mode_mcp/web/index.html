@@ -64,6 +64,18 @@
     opacity: .04;
   }
   body.light::before { opacity: .07; }
+  /* 官方原畫背景(可在右上選單切換) */
+  #bg {
+    position: fixed; inset: 0; z-index: -3; pointer-events: none;
+    background-size: cover; background-position: center 18%;
+  }
+  #bg::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(10,14,20,.78) 0%, rgba(10,14,20,.9) 55%, rgba(10,14,20,.96) 100%);
+  }
+  body.light #bg::after {
+    background: linear-gradient(180deg, rgba(243,241,234,.86) 0%, rgba(243,241,234,.94) 55%, rgba(243,241,234,.97) 100%);
+  }
   header {
     padding: 28px 20px 0; max-width: 1180px; margin: 0 auto;
   }
@@ -79,7 +91,12 @@
   .sub .patch { color: var(--gold); font-weight: 600; }
 
   nav { display: flex; gap: 8px; border-bottom: 1px solid var(--line); align-items: center; }
-  .langs { margin-left: auto; display: flex; gap: 4px; padding-bottom: 6px; }
+  .langs { margin-left: auto; display: flex; gap: 4px; padding-bottom: 6px; align-items: center; }
+  .langs select {
+    padding: 4px 6px; font-size: 12.5px; max-width: 168px;
+    background: var(--panel); border: 1px solid var(--line); color: var(--muted);
+    font-family: inherit; outline: none;
+  }
   .langs button {
     padding: 4px 12px; font-size: 13px; border: 1px solid var(--line);
     background: var(--panel); color: var(--muted); cursor: pointer;
@@ -263,6 +280,7 @@
 </style>
 </head>
 <body>
+<div id="bg"></div>
 <header>
   <h1>LoL <span class="gold">模式資料庫</span><span class="byline">by zhongiii</span></h1>
   <p class="sub" id="meta">載入中…</p>
@@ -276,6 +294,7 @@
       <button id="lang-en">EN</button>
       <button id="theme-btn" title="深色/淺色">◐</button>
       <button id="font-btn" title="字體大小">A</button>
+      <select id="bg-select" title="背景原畫"><option value="">背景:無</option></select>
     </div>
   </nav>
 </header>
@@ -390,6 +409,42 @@ function setTheme(t) {
 $("theme-btn").onclick = () =>
   setTheme(document.body.classList.contains("light") ? "dark" : "light");
 try { setTheme(localStorage.getItem("theme") || "dark"); } catch (e) {}
+
+/* ---------------- 背景原畫(官方 splash) ---------------- */
+function setBg(v) {
+  state.bgVal = v || "";
+  $("bg-select").value = state.bgVal;
+  let url = "";
+  if (v) {
+    const [cid, num] = v.split("_");
+    const c = (state.bgs || []).find((x) => x.id === cid);
+    const s = c && c.skins.find((x) => String(x.num) === num);
+    if (s) url = s.url;
+  }
+  $("bg").style.backgroundImage = url ? `url("${url}")` : "";
+  try { localStorage.setItem("bg", state.bgVal); } catch (e) {}
+}
+async function initBg() {
+  try {
+    const r = await fetch("/api/backgrounds");
+    if (!r.ok) return;
+    state.bgs = (await r.json()).champions;
+    $("bg-select").innerHTML = '<option value="">背景:無</option>' +
+      state.bgs.map((c) => `<optgroup label="${esc(c.name)}">` +
+        c.skins.map((s) => `<option value="${c.id}_${s.num}">${esc(s.name)}</option>`).join("") +
+        "</optgroup>").join("");
+    let v = null;
+    try { v = localStorage.getItem("bg"); } catch (e) {}
+    if (v === null) {  // 第一次來:預設泳池狂歡 柔依
+      const zoe = state.bgs.find((c) => c.id === "Zoe");
+      const pool = zoe && zoe.skins.find((s) => s.name.includes("泳池"));
+      v = pool ? `Zoe_${pool.num}` : "";
+    }
+    setBg(v);
+  } catch (e) {}
+}
+$("bg-select").onchange = (e) => setBg(e.target.value);
+initBg();
 
 /* ---------------- 字體大小 ---------------- */
 const FONT_STEPS = ["", "fs-lg", "fs-xl", "fs-sm"];  // 標準→大→特大→小

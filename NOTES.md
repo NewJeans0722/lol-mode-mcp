@@ -181,6 +181,16 @@ src/lol_mode_mcp/
 
 ## 日誌
 
+- **2026-07-11**(背景原畫切換):右上選單可換柔依/布蕾爾全造型背景
+  (官方正名是「柔依」「布蕾爾」,不是柔伊/布雷爾),預設「泳池狂歡
+  柔依」。
+  - 圖源 = Riot Data Dragon splash CDN(`cdn/img/champion/splash/
+    {cid}_{num}.jpg`),`/api/backgrounds` 伺服器端逐 num HEAD 探測
+  (⚠️ 炫彩造型回 403 沒有獨立原畫,自動濾掉;柔依 45→10、
+    布蕾爾 29→4),官方出新造型清單自動跟上。首次組建 ~24s
+  (74 個 HEAD),快取 12h + warmup 涵蓋。
+  - 前端 #bg 固定圖層(z-index -3)+ 深/淺主題各自的漸層遮罩保持
+    可讀性;選擇存 localStorage;要加英雄改 web.py `BG_CHAMPIONS`。
 - **2026-07-11**(去 AI 味改版:Hextech 風 + zhongiii 品牌):
   使用者嫌「太 Claude 味」(裝飾 emoji、通用膠囊風)。已拍板:
   Hextech 視覺 + 署名 zhongiii(GitHub 帳號不改)+ tool 輸出

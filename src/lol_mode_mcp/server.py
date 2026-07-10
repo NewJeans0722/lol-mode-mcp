@@ -175,13 +175,14 @@ def mode_mechanics() -> str:
 # 同一個 HTTP server 順便掛查詢網頁(給人用)與 JSON API(給網頁的 JS 用);
 # MCP 客戶端仍走 /mcp,互不干擾。stdio 模式下這些路由不存在。
 from .web import (api_aram, api_arena_balance, api_augments,  # noqa: E402
-                  api_patch_notes, home)
+                  api_backgrounds, api_patch_notes, home)
 
 mcp.custom_route("/", methods=["GET"])(home)
 mcp.custom_route("/api/augments", methods=["GET"])(api_augments)
 mcp.custom_route("/api/aram", methods=["GET"])(api_aram)
 mcp.custom_route("/api/arena-balance", methods=["GET"])(api_arena_balance)
 mcp.custom_route("/api/patch-notes", methods=["GET"])(api_patch_notes)
+mcp.custom_route("/api/backgrounds", methods=["GET"])(api_backgrounds)
 
 
 def main() -> None:
