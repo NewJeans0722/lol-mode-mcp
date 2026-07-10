@@ -5,7 +5,14 @@
 
 ## 目前狀態(2026-07-09)
 
-**Phase 1 完成、Phase 2 完成(超前進度),Phase 3(部署)未開始。**
+**Phase 1~3 全部完成,已上線:`https://lol-mode-mcp.onrender.com/mcp`(v0.1.0)**
+
+下一步候選(和使用者討論中):tool 回覆附上海克斯強化圖示。
+圖源已驗證:CommunityDragon 直接掛遊戲資產,
+`https://raw.communitydragon.org/latest/game/` + JSON 裡的 `iconLarge` 路徑
+(例:`assets/ux/cherry/augments/icons/cerberus_large.png` → HTTP 200)。
+呈現方式二選一:(a) 文字附連結(便宜);(b) MCP ImageContent 內嵌
+base64 圖(Claude 會直接顯示圖卡,較慢較肥)。
 
 - ✅ 專案骨架(uv + src layout + console script `lol-mode-mcp`)
 - ✅ `get_augment` / `list_augments`(競技場強化,中英雙語搜尋)
@@ -134,6 +141,15 @@ src/lol_mode_mcp/
   re-export `mcp`),**dashboard 的 entrypoint 要填 `server.py:mcp`**。
   用 `uv run --with fastmcp fastmcp inspect server.py:mcp` 驗證過
   (fastmcp 3.x runner 可載入官方 SDK 的 FastMCP 物件)。
+- **2026-07-10**(Phase 3 完成):FastMCP Cloud 修好 entrypoint 與
+  fastmcp 依賴後部署成功,但強制 Horizon 帳號驗證(401),公開存取
+  要付費 → **放棄,改用 Render 免費方案**(`render.yaml` blueprint,
+  push 自動部署)。Render 上首戰 **421 Misdirected Request**:官方 SDK
+  的 DNS rebinding 防護預設只放行 localhost Host header,雲端反代必炸
+  → 以 `TransportSecuritySettings(enable_dns_rebinding_protection=False)`
+  關閉(公開資料服務,安全上可接受)。上線後全流程驗收通過
+  (握手 1.1s、各 tool 0.2~2.1s),README 填入正式網址,打 v0.1.0 tag。
+  Claude Desktop(Store 版)設定已寫好,使用者待實測 connector。
 
 - **2026-07-09**(session 1):讀 brief → 驗證三個資料源(見上)→
   完成骨架 + 全部 4 tools + resource + 快取/錯誤處理 + 28 tests →
