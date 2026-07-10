@@ -47,9 +47,36 @@ _TIP_LABELS = {
 }
 
 
+def _split_top_level(inner: str) -> list[str]:
+    """依 '|' 切參數,但不切 [[連結|參數]] 內的管線。"""
+    parts: list[str] = []
+    buf: list[str] = []
+    depth = 0
+    i = 0
+    while i < len(inner):
+        two = inner[i:i + 2]
+        if two == "[[":
+            depth += 1
+            buf.append(two)
+            i += 2
+        elif two == "]]":
+            depth = max(0, depth - 1)
+            buf.append(two)
+            i += 2
+        elif inner[i] == "|" and depth == 0:
+            parts.append("".join(buf))
+            buf = []
+            i += 1
+        else:
+            buf.append(inner[i])
+            i += 1
+    parts.append("".join(buf))
+    return parts
+
+
 def _split_params(inner: str) -> tuple[str, list[str], dict[str, str]]:
     """'name|a|k=v|b' → (name, [a, b], {k: v})。"""
-    parts = inner.split("|")
+    parts = _split_top_level(inner)
     name = parts[0].strip().lower()
     pos: list[str] = []
     named: dict[str, str] = {}
@@ -136,6 +163,40 @@ def _render(name: str, pos: list[str], named: dict[str, str]) -> str:
 
     logger.debug("unknown wikitext template %r, using first param", name)
     return p0
+
+
+# 清理器產生的中文標注 → 英文(給 locale=en_us 的輸出用)。
+# 和上面 _render/_TIP_LABELS 的中文字樣一一對應,改哪邊都要同步。
+_EN_FIXED = [
+    ("(隨技能等級)", " (scales with skill rank)"),
+    ("(隨等級)", " (scales with level)"),
+    ("(已知 bug)", " (known bug)"),
+    (" 金幣", " gold"),
+    (" 適應之力", " adaptive force"),
+]
+_EN_REGEX = [
+    # 注意:_render 的標注用的是半形括號,這裡要跳脫才是字面括號
+    (re.compile(r"\(隨 (.+?) 變化\)"), r" (scales with \1)"),
+    (re.compile(r"近戰 (.+?)/遠程 "), r"melee \1 / ranged "),
+]
+_TIP_LABELS_EN = {
+    "效果半徑": "effect radius", "衝刺": "dash", "閃現位移": "blink",
+    "附著": "attach", "擊殺參與": "takedown", "緩速抗性": "slow resist",
+    "緩速": "slow", "治療": "heal", "護盾": "shield",
+    "施放判定": "cast instance", "爆擊": "critical strike",
+    "重創(Grievous Wounds)": "Grievous Wounds",
+}
+
+
+def translate_annotations_en(text: str) -> str:
+    """把 clean_wikitext 加上的中文標注換回英文(其餘內容不動)。"""
+    for zh, en in _EN_FIXED:
+        text = text.replace(zh, en)
+    for pattern, repl in _EN_REGEX:
+        text = pattern.sub(repl, text)
+    for zh, en in _TIP_LABELS_EN.items():
+        text = text.replace(zh, en)
+    return text
 
 
 _TEMPLATE_RE = re.compile(r"\{\{([^{}]*)\}\}")

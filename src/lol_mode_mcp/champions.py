@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 VERSIONS_URL = "https://ddragon.leagueoflegends.com/api/versions.json"
 CHAMPION_URL = "https://ddragon.leagueoflegends.com/cdn/{ver}/data/{locale}/champion.json"
+CHAMPION_FULL_URL = "https://ddragon.leagueoflegends.com/cdn/{ver}/data/{locale}/championFull.json"
 
 
 @dataclass
@@ -56,6 +57,47 @@ def _fetch_champions() -> list[Champion]:
 
 def get_champions() -> cache.CacheResult:
     return cache.get_cached("champions", _fetch_champions)
+
+
+# ---------------------------------------------------- 技能台服名對照
+# championFull.json(en_US + zh_TW,各約 2MB)→ 每英雄的技能名對照。
+# 變形英雄的技能名是複合字串(en "Cunning Sweep / Sundering Slam"
+# ↔ zh「暗襲／裂斬」),兩邊都用斜線切開、按位置配對,
+# 讓 wiki 的單一技能名("Sundering Slam")也查得到台服名(「裂斬」)。
+
+def split_ability_names(name: str) -> list[str]:
+    return [p.strip() for p in re.split(r"[/／]", name) if p.strip()]
+
+
+def _fetch_spell_names() -> dict[str, dict]:
+    """{champion id: {"slots": {P/Q/W/E/R: 台服名}, "by_en": {en(小寫): 台服名}}}"""
+    ver = fetch_json(VERSIONS_URL)[0]
+    en = fetch_json(CHAMPION_FULL_URL.format(ver=ver, locale="en_US"))["data"]
+    zh = fetch_json(CHAMPION_FULL_URL.format(ver=ver, locale="zh_TW"))["data"]
+    out: dict[str, dict] = {}
+    for cid, c_en in en.items():
+        c_zh = zh.get(cid)
+        if not c_zh:
+            continue
+        pairs = [("P", c_en["passive"]["name"], c_zh["passive"]["name"])]
+        pairs += [(slot, s_en["name"], s_zh["name"]) for slot, s_en, s_zh
+                  in zip("QWER", c_en["spells"], c_zh["spells"])]
+        slots: dict[str, str] = {}
+        by_en: dict[str, str] = {}
+        for slot, n_en, n_zh in pairs:
+            slots[slot] = n_zh
+            by_en[n_en.lower()] = n_zh
+            ens, zhs = split_ability_names(n_en), split_ability_names(n_zh)
+            if len(ens) == len(zhs):
+                for e, z in zip(ens, zhs):
+                    by_en[e.lower()] = z
+        out[cid] = {"slots": slots, "by_en": by_en}
+    logger.info("spell name map loaded: %d champions (ddragon %s)", len(out), ver)
+    return out
+
+
+def get_spell_names() -> cache.CacheResult:
+    return cache.get_cached("spell_names", _fetch_spell_names)
 
 
 def resolve_champion(query: str, champs: list[Champion]) -> tuple[Champion | None, list[Champion]]:

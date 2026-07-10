@@ -97,34 +97,39 @@ def aram_balance(champion: str) -> str:
 
 
 @mcp.tool()
-def arena_balance(champion: str) -> str:
+def arena_balance(champion: str, locale: str = "zh_tw") -> str:
     """查詢英雄本 patch 的競技場(Arena)平衡調整,標明增益與削弱。
 
     涵蓋:基礎數值加成(生命/攻擊/護甲/攻速的基礎值與成長值)
     與逐技能改動(冷卻、傷害、係數等,取自英文 wiki)。
-    「無調整」與「查詢失敗」會明確區分。
+    中文版技能名使用台服官方譯名。「無調整」與「查詢失敗」會明確區分。
 
     Args:
         champion: 英雄名稱,中英文皆可(例:「阿卡莉」、"Akali")。
+        locale: 回覆語言,"zh_tw"(預設)或 "en_us"。
     """
-    logger.info("tool arena_balance(champion=%r)", champion)
-    return do_arena_balance(champion)
+    logger.info("tool arena_balance(champion=%r, locale=%r)", champion, locale)
+    return do_arena_balance(champion, locale)
 
 
 @mcp.tool()
-def arena_patch_notes(patch: str = "latest", query: str = "") -> str:
+def arena_patch_notes(patch: str = "latest", query: str = "",
+                      locale: str = "zh_tw") -> str:
     """查詢某一版 patch 的競技場(Arena)改動清單(舊值 ⇒ 新值)。
 
     涵蓋:強化(Augments)、英雄、裝備、貴賓(Guest of Honor)的
     數值與機制改動,即「相對上一版的 nerf/buff」。
+    中文版的名稱使用台服官方譯名(ddragon/cdragon 遊戲內字串)。
 
     Args:
         patch: "latest"(預設,最新版)或版本號(例:「26.13」、"V26.12")。
         query: 選填,只看特定對象的改動,中英文皆可
                (例:「殞落之祭」、「伊莉絲」、"Eclipse")。
+        locale: 回覆語言,"zh_tw"(預設)或 "en_us"。
     """
-    logger.info("tool arena_patch_notes(patch=%r, query=%r)", patch, query)
-    return do_arena_patch_notes(patch, query)
+    logger.info("tool arena_patch_notes(patch=%r, query=%r, locale=%r)",
+                patch, query, locale)
+    return do_arena_patch_notes(patch, query, locale)
 
 
 @mcp.tool()

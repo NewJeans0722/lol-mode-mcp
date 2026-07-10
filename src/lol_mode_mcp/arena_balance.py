@@ -20,15 +20,16 @@ import re
 
 from . import cache
 from .aram import WIKI_API, get_wiki_data
-from .champions import Champion, get_champions, resolve_champion
+from .champions import (Champion, get_champions, get_spell_names,
+                        resolve_champion)
 from .http_util import fetch_json
-from .wikitext import clean_wikitext
+from .wikitext import clean_wikitext, translate_annotations_en
 
 logger = logging.getLogger(__name__)
 
 MAPCHANGES_TITLE = "Module:MapChanges/data/ar"
 
-# 基礎數值欄位 → 中文標籤(值一律是「加減量」,正 = 增益)
+# 基礎數值欄位 → 標籤(值一律是「加減量」,正 = 增益)
 AR_STAT_LABELS = {
     "hp_base": "基礎生命值",
     "hp_lvl": "每級生命成長",
@@ -39,6 +40,17 @@ AR_STAT_LABELS = {
     "mr_base": "基礎魔法抗性",
     "mr_lvl": "每級魔抗成長",
     "as_lvl": "每級攻擊速度成長(百分點)",
+}
+AR_STAT_LABELS_EN = {
+    "hp_base": "Base health",
+    "hp_lvl": "Health growth per level",
+    "dam_base": "Base attack damage",
+    "dam_lvl": "AD growth per level",
+    "arm_base": "Base armor",
+    "arm_lvl": "Armor growth per level",
+    "mr_base": "Base magic resist",
+    "mr_lvl": "MR growth per level",
+    "as_lvl": "AS growth per level (percentage points)",
 }
 
 # wiki 條目 key 用的英雄名 ≠ ddragon 顯示名時的別名表
@@ -133,13 +145,33 @@ def group_champion_changes(
 
 # ------------------------------------------------------------- tool 實作
 
-def _format_stat(key: str, value: float) -> str:
-    label = AR_STAT_LABELS.get(key, key)
-    icon = "🟢 增益" if value > 0 else "🔴 削弱"
+def ability_zh_name(champ_id: str, label: str,
+                    spell_names: dict | None) -> str | None:
+    """技能標籤(Q/W/E/R/被動/英文技能名)→ 台服技能名;查不到回 None。"""
+    info = (spell_names or {}).get(champ_id)
+    if not info:
+        return None
+    if label in ("Q", "W", "E", "R"):
+        return info["slots"].get(label)
+    if label == "被動":
+        return info["slots"].get("P")
+    if label == "整體":
+        return None
+    return info["by_en"].get(label.lower())
+
+
+def _format_stat(key: str, value: float, locale: str = "zh_tw") -> str:
+    if locale == "en_us":
+        label = AR_STAT_LABELS_EN.get(key, key)
+        icon = "🟢 Buff" if value > 0 else "🔴 Nerf"
+    else:
+        label = AR_STAT_LABELS.get(key, key)
+        icon = "🟢 增益" if value > 0 else "🔴 削弱"
     return f"{icon} {label} {value:+g}"
 
 
-def do_arena_balance(champion: str) -> str:
+def do_arena_balance(champion: str, locale: str = "zh_tw") -> str:
+    en = locale.strip().lower() == "en_us"
     try:
         champs_result = get_champions()
     except cache.DataUnavailableError as exc:
@@ -183,32 +215,63 @@ def do_arena_balance(champion: str) -> str:
                 f"{champ.name_zh}({champ.name_en}),但無法取得 LoL Wiki 的"
                 f"競技場資料,請稍後再試。技術細節:{'; '.join(problems)}")
 
-    title = f"⚔️ {champ.name_zh}({champ.name_en})"
-    if champ.title_zh:
-        title += f" — {champ.title_zh}"
-    lines = [title, "競技場(Arena)本 patch 平衡調整:", ""]
+    spell_names = None
+    if not en:  # 技能台服名(查不到就退回英文,不影響主要內容)
+        try:
+            spell_names = get_spell_names().data
+        except cache.DataUnavailableError as exc:
+            logger.warning("spell name map unavailable: %s", exc)
+
+    if en:
+        title = f"⚔️ {champ.name_en}({champ.name_zh})"
+        lines = [title, "Arena balance changes this patch:", ""]
+    else:
+        title = f"⚔️ {champ.name_zh}({champ.name_en})"
+        if champ.title_zh:
+            title += f" — {champ.title_zh}"
+        lines = [title, "競技場(Arena)本 patch 平衡調整:", ""]
 
     if stats:
-        lines.append("【基礎數值】")
-        lines += [_format_stat(k, v) for k, v in stats.items()]
+        lines.append("[Base stats]" if en else "【基礎數值】")
+        lines += [_format_stat(k, v, locale) for k, v in stats.items()]
         lines.append("")
 
     if abilities:
-        lines.append("【技能調整】(取自英文 wiki,術語保留原文)")
+        lines.append("[Ability changes]" if en
+                     else "【技能調整】(取自英文 wiki,術語保留原文)")
         for label, entry_lines in abilities:
-            lines.append(f"▸ {label}")
+            shown = label
+            if en:
+                shown = {"被動": "Passive", "整體": "General"}.get(label, label)
+                entry_lines = [translate_annotations_en(ln) for ln in entry_lines]
+            else:
+                zh = ability_zh_name(champ.id, label, spell_names)
+                if zh:
+                    shown = f"{label} {zh}" if label in ("Q", "W", "E", "R", "被動") \
+                        else f"{zh}({label})"
+            lines.append(f"▸ {shown}")
             lines += ["  " + ln for ln in entry_lines]
         lines.append("")
 
     if not stats and not abilities:
-        lines = [title,
-                 "本 patch **沒有競技場專屬的平衡調整**(基礎數值與技能"
-                 "皆使用一般數值)。", ""]
+        no_change = ("No Arena-specific balance changes this patch "
+                     "(base stats and abilities use standard values)."
+                     if en else
+                     "本 patch **沒有競技場專屬的平衡調整**(基礎數值與技能"
+                     "皆使用一般數值)。")
+        lines = [title, no_change, ""]
 
-    src = (f"📌 資料:LoL Wiki(CC BY-SA)· MapChanges 模組更新於 {revision}")
-    if problems:
-        src += "\n⚠️ 部分資料源失敗:" + "; ".join(problems)
-    if stale:
-        src += "\n⚠️ 注意:資料更新失敗,以上為上次成功抓取的快取,可能過期。"
+    if en:
+        src = f"📌 Source: LoL Wiki (CC BY-SA) · MapChanges revised {revision}"
+        if problems:
+            src += "\n⚠️ Partial source failure: " + "; ".join(problems)
+        if stale:
+            src += "\n⚠️ Refresh failed; showing last cached data (may be outdated)."
+    else:
+        src = f"📌 資料:LoL Wiki(CC BY-SA)· MapChanges 模組更新於 {revision}"
+        if problems:
+            src += "\n⚠️ 部分資料源失敗:" + "; ".join(problems)
+        if stale:
+            src += "\n⚠️ 注意:資料更新失敗,以上為上次成功抓取的快取,可能過期。"
     lines.append(src)
     return "\n".join(lines)

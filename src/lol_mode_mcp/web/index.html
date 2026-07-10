@@ -35,7 +35,14 @@
   .sub { color: var(--muted); font-size: 14px; margin: 0 0 18px; }
   .sub .patch { color: var(--gold); font-weight: 600; }
 
-  nav { display: flex; gap: 8px; border-bottom: 1px solid var(--line); }
+  nav { display: flex; gap: 8px; border-bottom: 1px solid var(--line); align-items: center; }
+  .langs { margin-left: auto; display: flex; gap: 4px; padding-bottom: 6px; }
+  .langs button {
+    padding: 4px 12px; font-size: 13px; border: 1px solid var(--line);
+    border-radius: 999px; background: var(--panel); color: var(--muted);
+    cursor: pointer; font-family: inherit;
+  }
+  .langs button.active { color: var(--gold-bright); border-color: var(--gold); }
   nav button {
     background: none; border: none; color: var(--muted); font-size: 15px;
     padding: 10px 18px; cursor: pointer; border-bottom: 2px solid transparent;
@@ -140,6 +147,8 @@
     color: var(--gold-bright); font-weight: 600; font-size: 13px;
     background: var(--panel-2); border-radius: 6px; padding: 2px 8px; margin-top: 2px;
   }
+  .ab-body { flex: 1; min-width: 0; }
+  .ab-n { color: var(--gold); font-size: 12.5px; margin: 3px 0 2px; }
   .ab ul { margin: 0; padding-left: 18px; font-size: 13px; color: #c9d2de; }
   .ab li { margin: 2px 0; }
   .ab li.sub { list-style-type: circle; margin-left: 14px; }
@@ -157,7 +166,10 @@
     margin: 20px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--line);
   }
   .pcat:first-child { margin-top: 0; }
-  .pentry h3 { margin: 0 0 4px; font-size: 14.5px; }
+  .phead { display: flex; gap: 8px; align-items: center; margin-bottom: 4px; }
+  .phead img { width: 32px; height: 32px; border-radius: 6px; flex: none; background: var(--panel-2); }
+  .pentry h3 { margin: 0; font-size: 14.5px; }
+  .pentry h3 .en { color: var(--muted); font-size: 12px; margin-left: 6px; font-weight: 400; }
   .pentry ul { margin: 0; padding-left: 18px; font-size: 13px; color: #c9d2de; }
   .pentry li { margin: 2px 0; }
   .pentry li.sub { list-style-type: circle; margin-left: 14px; }
@@ -187,6 +199,10 @@
     <button id="tab-arena">⚔️ 競技場平衡</button>
     <button id="tab-patch">📋 Patch 改動</button>
     <button id="tab-aram">🏔️ ARAM 平衡表</button>
+    <div class="langs">
+      <button id="lang-zh" class="active">中</button>
+      <button id="lang-en">EN</button>
+    </div>
   </nav>
 </header>
 
@@ -270,6 +286,20 @@ function showTab(which) {
 }
 for (const t of TABS) $("tab-" + t).onclick = () => showTab(t);
 
+/* ---------------- 中/EN 切換 ---------------- */
+state.lang = "zh";
+function setLang(l) {
+  state.lang = l;
+  $("lang-zh").classList.toggle("active", l === "zh");
+  $("lang-en").classList.toggle("active", l === "en");
+  if (state.augs) { renderChips(); renderAugs(); }
+  if (state.arena) renderArena();
+  if (state.patch) renderPatch();
+  if (state.aram) renderAram();
+}
+$("lang-zh").onclick = () => setLang("zh");
+$("lang-en").onclick = () => setLang("en");
+
 /* ---------------- 海克斯圖鑑 ---------------- */
 async function loadAugments() {
   try {
@@ -299,13 +329,14 @@ function renderAugs() {
     (state.tier === "all" || a.tier === state.tier) &&
     (!q || (a.nameZh + a.nameEn + a.descZh + a.descEn).toLowerCase().includes(q)));
   $("aug-count").textContent = `顯示 ${list.length} 個`;
+  const zh = state.lang === "zh";
   $("aug-grid").innerHTML = list.map((a) => `
     <div class="card ${a.tier}">
       ${a.icon ? `<img src="${a.icon}" alt="" loading="lazy">` : ""}
       <div class="body">
-        <h3>${esc(a.nameZh)}<span class="badge ${a.tier}">${esc(a.tierZh)}</span></h3>
-        <div class="en">${esc(a.nameEn)}</div>
-        <div class="desc">${esc(a.descZh)}</div>
+        <h3>${esc(zh ? a.nameZh : a.nameEn)}<span class="badge ${a.tier}">${esc(zh ? a.tierZh : a.tier)}</span></h3>
+        <div class="en">${esc(zh ? a.nameEn : a.nameZh)}</div>
+        <div class="desc">${esc(zh ? a.descZh : a.descEn)}</div>
       </div>
     </div>`).join("");
 }
@@ -332,17 +363,24 @@ function statChip(labels, key, v) {
   const cls = v > 0 ? "buff" : "nerf";
   return `<span class="statchip ${cls}">${esc(labels[key] || key)} ${v > 0 ? "+" : ""}${v}</span>`;
 }
+// 中文分頁用的標籤在 EN 模式的對應
+const LABEL_EN = { "被動": "Passive", "整體": "General" };
 function abilityBlock(ab) {
-  const items = ab.lines.map((ln) => {
+  const zh = state.lang === "zh";
+  const items = (zh ? ab.lines : (ab.linesEn || ab.lines)).map((ln) => {
     const depth = (ln.match(/^ */)[0].length) / 2;   // 後端每層縮 2 格
     return `<li class="${depth > 0 ? "sub" : ""}">${richText(ln.replace(/^ *- /, ""))}</li>`;
   }).join("");
-  return `<div class="ab"><span class="ab-k">${esc(ab.label)}</span><ul>${items}</ul></div>`;
+  const chip = zh ? ab.label : (LABEL_EN[ab.label] || ab.label);
+  const name = zh && ab.labelZh && ab.labelZh !== ab.label
+    ? `<div class="ab-n">${esc(ab.labelZh)}</div>` : "";
+  return `<div class="ab"><span class="ab-k">${esc(chip)}</span><div class="ab-body">${name}<ul>${items}</ul></div></div>`;
 }
 function renderArena() {
+  const zh = state.lang === "zh";
   const q = state.arenaQ.trim().toLowerCase();
   const onlyChanged = $("arena-only").checked;
-  const labels = state.arena.statLabels;
+  const labels = zh ? state.arena.statLabels : state.arena.statLabelsEn;
   const list = state.arena.champions.filter((c) =>
     (!onlyChanged || c.stats || c.abilities.length) &&
     (!q || (c.nameZh + c.nameEn + c.id).toLowerCase().includes(q)));
@@ -352,8 +390,8 @@ function renderArena() {
       <div class="ahead">
         <img src="${c.icon}" alt="" loading="lazy">
         <div>
-          <h3>${esc(c.nameZh)}<span class="en">${esc(c.nameEn)}</span></h3>
-          <div class="title">${esc(c.titleZh)}</div>
+          <h3>${esc(zh ? c.nameZh : c.nameEn)}<span class="en">${esc(zh ? c.nameEn : c.nameZh)}</span></h3>
+          ${zh && c.titleZh ? `<div class="title">${esc(c.titleZh)}</div>` : ""}
         </div>
       </div>
       ${c.stats ? `<div class="statchips">${Object.entries(c.stats).map(([k, v]) => statChip(labels, k, v)).join("")}</div>` : ""}
@@ -383,22 +421,35 @@ async function loadPatch(ver) {
     $("patch-status").textContent = "載入失敗:" + e.message;
   }
 }
+// 分類的中文標籤(和後端 CATEGORY_LABELS 對齊)
+const PCAT_ZH = { "general": "一般", "augments": "強化", "champions": "英雄",
+  "items": "裝備", "guests of honor": "貴賓", "anvils": "鐵砧", "systems": "系統" };
 function renderPatch() {
+  const zh = state.lang === "zh";
   const q = state.patchQ.trim().toLowerCase();
   let total = 0;
   const html = state.patch.categories.map((c) => {
-    const entries = c.entries.filter((e) => !q || e.name.toLowerCase().includes(q));
+    const entries = c.entries.filter((e) =>
+      !q || (e.name + (e.nameZh || "")).toLowerCase().includes(q));
     if (!entries.length) return "";
     total += entries.length;
-    return `<div class="pcat">${esc(c.category)}</div><div class="agrid">` +
-      entries.map((e) => `
+    const cat = zh && PCAT_ZH[c.category.toLowerCase()]
+      ? `${PCAT_ZH[c.category.toLowerCase()]} ${c.category}` : c.category;
+    return `<div class="pcat">${esc(cat)}</div><div class="agrid">` +
+      entries.map((e) => {
+        const title = zh && e.nameZh
+          ? `<h3>${esc(e.nameZh)}<span class="en">${richText(e.name)}</span></h3>`
+          : `<h3>${richText(e.name)}</h3>`;
+        const lns = zh ? e.lines : (e.linesEn || e.lines);
+        return `
         <div class="acard pentry">
-          <h3>${richText(e.name)}</h3>
-          ${e.lines.length ? "<ul>" + e.lines.map((ln) => {
+          <div class="phead">${e.icon ? `<img src="${e.icon}" alt="" loading="lazy">` : ""}${title}</div>
+          ${lns.length ? "<ul>" + lns.map((ln) => {
             const depth = (ln.match(/^ */)[0].length) / 2;
             return `<li class="${depth > 0 ? "sub" : ""}">${richText(ln.replace(/^ *- /, ""))}</li>`;
           }).join("") + "</ul>" : ""}
-        </div>`).join("") + "</div>";
+        </div>`;
+      }).join("") + "</div>";
   }).join("");
   $("patch-count").textContent = `${state.patch.patch} · ${total} 個條目`;
   $("patch-content").innerHTML = html || '<div class="status">沒有符合的條目</div>';
@@ -455,12 +506,13 @@ function renderAram() {
       dir * (((cellVal(a.changes, k) ?? base)) - ((cellVal(b.changes, k) ?? base))));
   }
   $("aram-count").textContent = `顯示 ${rows.length} 位英雄`;
-  const labels = state.aram.fields;
-  const head = "<tr><th data-k=''>英雄</th>" + ARAM_COLS.map(([k]) =>
+  const zh = state.lang === "zh";
+  const labels = zh ? state.aram.fields : (state.aram.fieldsEn || state.aram.fields);
+  const head = `<tr><th data-k=''>${zh ? "英雄" : "Champion"}</th>` + ARAM_COLS.map(([k]) =>
     `<th data-k="${k}">${labels[k] || k}${state.sortKey === k ? `<span class="arrow"> ${state.sortDir > 0 ? "▲" : "▼"}</span>` : ""}</th>`).join("") + "</tr>";
   const body = rows.map((c) => `
     <tr>
-      <td class="champ"><img src="${c.icon}" alt="" loading="lazy">${esc(c.nameZh)}<span class="en">${esc(c.nameEn)}</span></td>
+      <td class="champ"><img src="${c.icon}" alt="" loading="lazy">${esc(zh ? c.nameZh : c.nameEn)}<span class="en">${esc(zh ? c.nameEn : c.nameZh)}</span></td>
       ${ARAM_COLS.map(([k, kind, hb]) => fmtCell(cellVal(c.changes, k), kind, hb)).join("")}
     </tr>`).join("");
   $("aram-table").innerHTML = head + body;

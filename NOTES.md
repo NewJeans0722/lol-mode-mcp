@@ -92,7 +92,8 @@ src/lol_mode_mcp/
   arena_balance.py 競技場每英雄調整:MapChanges/ar 解析、依英雄分組、tool
   patch_notes.py 逐 patch 競技場改動:patch 頁枚舉/Arena 段落解析/中文查詢翻譯
   wikitext.py    wiki {{模板}}/[[連結]] → 純文字(MapChanges + patch 頁共用)
-  champions.py   英雄名正規化(Data Dragon en_US + zh_TW)
+  champions.py   英雄名正規化(Data Dragon en_US + zh_TW)+ 技能台服名
+                 (championFull.json,含變形英雄複合技能名切分)
   formatting.py  @佔位符@ 代入 dataValues、HTML 標籤清理
   cache.py       記憶體 TTL 快取(12h),重抓失敗退回 stale 並標注
   http_util.py   httpx 共用(timeout 15s、User-Agent)
@@ -180,6 +181,29 @@ src/lol_mode_mcp/
 
 ## 日誌
 
+- **2026-07-10**(中英雙版本 + 台服名 + 圖示):使用者要求「英文都要有
+  對應中文,而且要台服官方譯名(不是機翻),英雄附圖示,做中英兩版本」。
+  - **台服名來源(全部是遊戲內字串,不翻譯)**:英雄/裝備 = ddragon
+    zh_TW(champion.json/item.json)、強化 = cdragon arena zh_tw、
+    技能名 = ddragon **championFull.json**(en+zh 各 ~2MB,cache key
+    `spell_names`)。變形英雄的複合技能名(en "Cunning Sweep /
+    Sundering Slam" ↔ zh「暗襲/裂斬」)兩邊都按斜線切開按位置配對
+    (champions.py `split_ability_names`)。
+  - patch_notes 條目名比對用 `_name_key`(小寫去空白標點),解掉
+    wiki "Hivemind" ↔ 遊戲 "Hive Mind"。**查不到就保留英文**:
+    Juiced/Spellcraft/Final Form 等 V26.09 新強化不在 cdragon
+    arena json(226 筆)裡;cherry-augments.json(638 筆)查證過是
+    **Mayhem 專用**(ARAM_ 前綴),幫不上競技場。
+  - 兩個 tool 都加 `locale`("zh_tw"/"en_us")。en 版把清理器的中文
+    標注轉回英文(wikitext.py `translate_annotations_en`,和 _render
+    的字樣要同步)。網頁 header 加全域「中/EN」切換,四個分頁的名稱
+    /說明/表頭都跟著換;patch 分頁英雄條目附圖示,中文名可搜尋。
+  - 🐛 **修掉一個潛伏 bug**:模板參數依 `|` 切割會切爛
+    `[[File:xxx.png|20px|border]]` 這種帶管線的連結(Ryze/Mel/Zac
+    的 pp type= 受害,中文版也是壞的)→ `_split_top_level` 追蹤
+    [[ ]] 深度。另一個:en 轉換 regex 的括號要跳脫(半形字面括號)。
+  - 驗收:82 tests(+9);API linesEn 全量掃描零殘留中文標注、
+    node 雙語渲染四分頁全過;正式站部署後驗證(見下)。
 - **2026-07-10**(競技場擴充第 4 項):新 tool `arena_patch_notes` +
   網頁「📋 Patch 改動」分頁(`/api/patch-notes?patch=`)。實作重點:
   - 資料源:各 patch 頁(V26.13 等)的 `== Arena ==` 段落,三層 bullet

@@ -1,6 +1,8 @@
-"""patch_notes.py:patch 頁 Arena 段落解析與過濾(離線)。"""
+"""patch_notes.py:patch 頁 Arena 段落解析、過濾與台服名對照(離線)。"""
 
-from lol_mode_mcp.patch_notes import (_filter_categories, extract_mode_section,
+from lol_mode_mcp.champions import split_ability_names
+from lol_mode_mcp.patch_notes import (_filter_categories, _name_key,
+                                      extract_mode_section, localize_entry,
                                       normalize_patch, parse_mode_changes)
 
 # 注意 '== Arena ===' 是 wiki 上實際出現過的「等號不對稱」寫法,要容錯
@@ -75,3 +77,43 @@ def test_filter_matches_case_insensitive_terms():
 
 def test_filter_no_match_returns_empty():
     assert _filter_categories(_cats(), {"Rite Of Ruin"}) == []
+
+
+# ---------------------------------------------------------- 台服名對照
+
+LOC = {
+    "champions": {_name_key("Elise"): ("伊莉絲", "http://icon/Elise.png"),
+                  _name_key("Kayn"): ("凱隱", "http://icon/Kayn.png")},
+    "augments": {_name_key("Hive Mind"): "蜂群意識"},
+    "items": {_name_key("Eclipse"): "月蝕"},
+}
+
+
+def test_localize_champion_with_icon():
+    assert localize_entry("Elise", "Champions", LOC) == \
+        ("伊莉絲", "http://icon/Elise.png")
+
+
+def test_localize_strips_parenthetical_suffix():
+    zh, icon = localize_entry("Kayn (Shadow Assassin)", "Champions", LOC)
+    assert zh == "凱隱" and icon
+
+
+def test_localize_ignores_spacing_differences():
+    # wiki 寫 Hivemind,遊戲字串是 Hive Mind
+    assert localize_entry("Hivemind", "Augments", LOC) == ("蜂群意識", None)
+
+
+def test_localize_unknown_category_tries_all_tables():
+    assert localize_entry("Eclipse", "Systems", LOC) == ("月蝕", None)
+
+
+def test_localize_miss_returns_none():
+    assert localize_entry("Spellcraft", "Augments", LOC) == (None, None)
+
+
+def test_split_composite_ability_names():
+    # 變形英雄的複合技能名,en 用 "/"、zh 用全形 "/",按位置配對
+    assert split_ability_names("Cunning Sweep / Sundering Slam") == \
+        ["Cunning Sweep", "Sundering Slam"]
+    assert split_ability_names("暗襲/裂斬") == ["暗襲", "裂斬"]

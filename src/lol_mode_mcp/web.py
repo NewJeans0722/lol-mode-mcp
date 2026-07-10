@@ -19,12 +19,15 @@ from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse
 
 from . import cache
-from .aram import FIELD_INFO, get_wiki_data
+from .aram import FIELD_INFO, FIELD_LABELS_EN, get_wiki_data
 from .arena import RARITY_INFO, get_arena_data
-from .arena_balance import (AR_STAT_LABELS, get_map_changes,
+from .arena_balance import (AR_STAT_LABELS, AR_STAT_LABELS_EN,
+                            ability_zh_name, get_map_changes,
                             group_champion_changes)
-from .champions import get_champions
-from .patch_notes import get_arena_notes, get_patch_titles, normalize_patch
+from .champions import get_champions, get_spell_names
+from .wikitext import translate_annotations_en
+from .patch_notes import (enrich_categories, get_arena_notes,
+                          get_patch_titles, normalize_patch)
 
 logger = logging.getLogger(__name__)
 
@@ -79,11 +82,16 @@ async def api_arena_balance(_: Request) -> JSONResponse:
         return JSONResponse({"error": f"資料源連線失敗:{exc}"}, status_code=503)
     ar = wiki.data.get("ar", {})
     grouped = group_champion_changes(mc.data["champions"], champs.data)
+    try:  # 技能台服名:抓不到只影響中文顯示,不擋主資料
+        spell_names = get_spell_names().data
+    except cache.DataUnavailableError:
+        spell_names = None
     payload = {
         "revision_time": mc.data["revision_time"],
         "fetched_at": mc.fetched_at_str,
         "stale": champs.is_stale or wiki.is_stale or mc.is_stale,
         "statLabels": AR_STAT_LABELS,
+        "statLabelsEn": AR_STAT_LABELS_EN,
         "champions": [
             {
                 "id": c.id,
@@ -92,8 +100,13 @@ async def api_arena_balance(_: Request) -> JSONResponse:
                 "titleZh": c.title_zh,
                 "icon": c.icon_url,
                 "stats": ar.get(c.name_en),                # None = 無基礎數值調整
-                "abilities": [{"label": label, "lines": lines}
-                              for label, lines in grouped.get(c.name_en, [])],
+                "abilities": [
+                    {"label": label,
+                     "labelZh": ability_zh_name(c.id, label, spell_names),
+                     "lines": lines,
+                     "linesEn": [translate_annotations_en(ln) for ln in lines]}
+                    for label, lines in grouped.get(c.name_en, [])
+                ],
             }
             for c in sorted(champs.data, key=lambda c: c.name_en)
         ],
@@ -127,7 +140,7 @@ async def api_patch_notes(request: Request) -> JSONResponse:
         "patches": titles[:16],  # 給下拉選單
         "fetched_at": fetched,
         "stale": stale,
-        "categories": notes["categories"],
+        "categories": enrich_categories(notes["categories"]),  # 補台服名/圖示
     })
 
 
@@ -143,6 +156,7 @@ async def api_aram(_: Request) -> JSONResponse:
         "fetched_at": wiki.fetched_at_str,
         "stale": wiki.is_stale or champs.is_stale,
         "fields": {k: v[0] for k, v in FIELD_INFO.items()},  # 欄位中文標籤
+        "fieldsEn": FIELD_LABELS_EN,
         "champions": [
             {
                 "id": c.id,

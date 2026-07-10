@@ -43,6 +43,16 @@ FIELD_INFO: dict[str, tuple[str, str, bool]] = {
     "tenacity":       ("韌性", "mult", True),        # 實測值 1.1/1.2,是乘數
     "energyregen_mod": ("能量回復", "mult", True),
 }
+FIELD_LABELS_EN = {
+    "dmg_dealt": "Damage Dealt",
+    "dmg_taken": "Damage Taken",
+    "healing": "Healing",
+    "shielding": "Shielding",
+    "ability_haste": "Ability Haste",
+    "total_as": "Total Attack Speed",
+    "tenacity": "Tenacity",
+    "energyregen_mod": "Energy Regen",
+}
 
 
 def parse_champion_mode_data(lua_text: str, mode_key: str = "aram") -> dict[str, dict[str, float]]:

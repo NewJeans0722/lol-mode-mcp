@@ -25,7 +25,7 @@ from . import cache
 from .arena import get_arena_data
 from .champions import get_champions, resolve_champion
 from .http_util import fetch_json
-from .wikitext import clean_wikitext
+from .wikitext import clean_wikitext, translate_annotations_en
 
 logger = logging.getLogger(__name__)
 
@@ -142,15 +142,21 @@ def get_arena_notes(title: str) -> cache.CacheResult:
 
 # ------------------------------------------------------------ 中文查詢翻譯
 
-def _fetch_item_names() -> dict[str, str]:
-    """ddragon item.json → {zh_TW 名: en 名}(給「殞落之祭」這種查詢用)。"""
+def _fetch_item_names() -> dict[str, dict[str, str]]:
+    """ddragon item.json → 雙向對照:{zh_to_en, en_to_zh(key 小寫)}。"""
     ver = fetch_json(VERSIONS_URL)[0]
     zh = fetch_json(ITEM_URL.format(ver=ver, locale="zh_TW"))["data"]
     en = fetch_json(ITEM_URL.format(ver=ver, locale="en_US"))["data"]
-    mapping = {zh[iid]["name"]: en[iid]["name"]
-               for iid in zh if iid in en and zh[iid].get("name")}
-    logger.info("item name map loaded: %d items (ddragon %s)", len(mapping), ver)
-    return mapping
+    zh_to_en: dict[str, str] = {}
+    en_to_zh: dict[str, str] = {}
+    for iid, item_zh in zh.items():
+        item_en = en.get(iid)
+        if not item_en or not item_zh.get("name"):
+            continue
+        zh_to_en[item_zh["name"]] = item_en["name"]
+        en_to_zh[item_en["name"].lower()] = item_zh["name"]
+    logger.info("item name map loaded: %d items (ddragon %s)", len(zh_to_en), ver)
+    return {"zh_to_en": zh_to_en, "en_to_zh": en_to_zh}
 
 
 def get_item_names() -> cache.CacheResult:
@@ -175,7 +181,7 @@ def _translate_query(query: str) -> set[str]:
     except cache.DataUnavailableError:
         pass
     try:  # 裝備
-        items = get_item_names().data
+        items = get_item_names().data["zh_to_en"]
         hits = [en for zh, en in items.items()
                 if query == zh or (len(query) >= 2 and query in zh)]
         if len(set(hits)) == 1:
@@ -183,6 +189,86 @@ def _translate_query(query: str) -> set[str]:
     except cache.DataUnavailableError:
         pass
     return terms
+
+
+# ------------------------------------------------------------ 台服名對照
+# 條目名(Elise / Eclipse / Buff Buddies)→ 台服官方譯名。
+# 來源都是遊戲內字串:英雄與裝備用 ddragon zh_TW、強化用 cdragon zh_tw,
+# 不做機器翻譯;查不到就保留英文。
+
+_PAREN_SUFFIX_RE = re.compile(r"\s*\([^)]*\)\s*$")  # "Kayn (Shadow Assassin)" 的尾註
+
+
+def _name_key(name: str) -> str:
+    """比對用正規化:小寫 + 去掉空白與標點(wiki "Hivemind" ↔ 遊戲 "Hive Mind")。"""
+    return re.sub(r"[^0-9a-z]+", "", name.lower())
+
+
+def _build_localizer() -> dict[str, dict]:
+    """三份對照表(key 已正規化);任一來源失敗只影響該類(名字退回英文)。"""
+    champs: dict[str, tuple[str, str]] = {}
+    try:
+        for c in get_champions().data:
+            champs[_name_key(c.name_en)] = (c.name_zh, c.icon_url)
+        if _name_key("Nunu & Willump") in champs:  # wiki 有時簡寫
+            champs.setdefault("nunu", champs[_name_key("Nunu & Willump")])
+    except cache.DataUnavailableError:
+        pass
+    augments: dict[str, str] = {}
+    try:
+        for a in get_arena_data().data.augments:
+            if a.name_en and a.name_zh:
+                augments[_name_key(a.name_en)] = a.name_zh
+    except cache.DataUnavailableError:
+        pass
+    items: dict[str, str] = {}
+    try:
+        items = {_name_key(en): zh
+                 for en, zh in get_item_names().data["en_to_zh"].items()}
+    except cache.DataUnavailableError:
+        pass
+    return {"champions": champs, "augments": augments, "items": items}
+
+
+# 分類 → 先查哪幾張表(未知分類三張都試)
+_CATEGORY_TABLES = {
+    "champions": ["champions"],
+    "guests of honor": ["champions"],
+    "items": ["items"],
+    "anvils": ["items"],
+    "augments": ["augments"],
+}
+
+
+def localize_entry(name: str, category: str,
+                   loc: dict[str, dict]) -> tuple[str | None, str | None]:
+    """條目名 → (台服名, 英雄圖示 URL);查不到 → (None, None)。"""
+    keys = [_name_key(name), _name_key(_PAREN_SUFFIX_RE.sub("", name))]
+    for kind in _CATEGORY_TABLES.get(category.lower(),
+                                     ["augments", "items", "champions"]):
+        table = loc.get(kind, {})
+        for key in keys:
+            hit = table.get(key)
+            if hit:
+                if kind == "champions":
+                    return hit  # (zh, icon)
+                return hit, None
+    return None, None
+
+
+def enrich_categories(categories: list[dict]) -> list[dict]:
+    """在每個條目補上 nameZh、icon 與 linesEn(網頁中/EN 切換用)。"""
+    loc = _build_localizer()
+    out = []
+    for c in categories:
+        entries = []
+        for e in c["entries"]:
+            zh, icon = localize_entry(e["name"], c["category"], loc)
+            entries.append({**e, "nameZh": zh, "icon": icon,
+                            "linesEn": [translate_annotations_en(ln)
+                                        for ln in e["lines"]]})
+        out.append({"category": c["category"], "entries": entries})
+    return out
 
 
 # ------------------------------------------------------------ tool 實作
@@ -203,7 +289,9 @@ def _filter_categories(categories: list[dict], terms: set[str]) -> list[dict]:
     return out
 
 
-def do_arena_patch_notes(patch: str = "latest", query: str = "") -> str:
+def do_arena_patch_notes(patch: str = "latest", query: str = "",
+                         locale: str = "zh_tw") -> str:
+    en = locale.strip().lower() == "en_us"
     try:
         titles: list[str] = get_patch_titles().data
     except cache.DataUnavailableError as exc:
@@ -256,8 +344,12 @@ def do_arena_patch_notes(patch: str = "latest", query: str = "") -> str:
                     break
                 hit = _filter_categories(older.data["categories"], terms)
                 if hit:
-                    fallback_note = (f"{notes['patch']}(最新版)沒有提到"
-                                     f"「{query}」;以下是最近一次改動:")
+                    fallback_note = (
+                        f"No mention of \"{query}\" in {notes['patch']} "
+                        f"(latest); showing its most recent change:"
+                        if en else
+                        f"{notes['patch']}(最新版)沒有提到「{query}」;"
+                        f"以下是最近一次改動:")
                     notes, filtered = older.data, hit
                     stale = older.is_stale
                     break
@@ -273,31 +365,53 @@ def do_arena_patch_notes(patch: str = "latest", query: str = "") -> str:
         categories = filtered
         matched_terms = terms - {query.strip()}
 
-    lines = [f"📋 競技場(Arena)patch 改動 — {notes['patch']}"]
-    if fallback_note:
-        lines.insert(0, f"ℹ️ {fallback_note}")
-    if query.strip():
-        shown = f"「{query}」"
-        if matched_terms:
-            shown += f"(對應英文:{'、'.join(sorted(matched_terms))})"
-        lines.append(f"只顯示與 {shown} 相關的條目")
-    lines += ["改動格式為「舊值 ⇒ 新值」(取自英文 wiki,術語保留原文)", ""]
+    if en:
+        lines = [f"📋 Arena patch changes — {notes['patch']}"]
+        if fallback_note:
+            lines.insert(0, f"ℹ️ {fallback_note}")
+        if query.strip():
+            lines.append(f"Showing only entries matching \"{query}\"")
+        lines += ["Format: old value ⇒ new value (from the English wiki)", ""]
+    else:
+        categories = enrich_categories(categories)  # 補台服名
+        lines = [f"📋 競技場(Arena)patch 改動 — {notes['patch']}"]
+        if fallback_note:
+            lines.insert(0, f"ℹ️ {fallback_note}")
+        if query.strip():
+            shown = f"「{query}」"
+            if matched_terms:
+                shown += f"(對應英文:{'、'.join(sorted(matched_terms))})"
+            lines.append(f"只顯示與 {shown} 相關的條目")
+        lines += ["改動格式為「舊值 ⇒ 新值」;名稱為台服官方譯名,"
+                  "查無譯名或說明原文保留英文", ""]
 
     for c in categories:
-        lines.append(f"【{_category_label(c['category'])}】")
+        lines.append(c["category"] if en
+                     else f"【{_category_label(c['category'])}】")
         for e in c["entries"]:
-            if e["lines"]:
-                lines.append(f"▸ {e['name']}")
-                lines += ["  " + ln for ln in e["lines"]]
+            name = e["name"]
+            if not en and e.get("nameZh"):
+                name = f"{e['nameZh']} {e['name']}"
+            entry_lines = ([translate_annotations_en(ln) for ln in e["lines"]]
+                           if en else e["lines"])
+            if entry_lines:
+                lines.append(f"▸ {name}")
+                lines += ["  " + ln for ln in entry_lines]
             else:
-                lines.append(f"- {e['name']}")  # 無子項的單行改動
+                lines.append(f"- {name}")  # 無子項的單行改動
         lines.append("")
 
-    src = "📌 資料:LoL Wiki(CC BY-SA)"
+    src = ("📌 Source: LoL Wiki (CC BY-SA)" if en
+           else "📌 資料:LoL Wiki(CC BY-SA)")
     if patch.strip().lower() in ("", "latest", "最新"):
         others = [t for t in titles[:5] if t != notes["patch"]]
-        src += f"\n💡 也可以用 patch 參數查舊版,例如:{'、'.join(others[:3])}"
+        if others:
+            src += (f"\n💡 Older patches via the patch param: {', '.join(others[:3])}"
+                    if en else
+                    f"\n💡 也可以用 patch 參數查舊版,例如:{'、'.join(others[:3])}")
     if stale:
-        src += "\n⚠️ 注意:資料更新失敗,以上為上次成功抓取的快取,可能過期。"
+        src += ("\n⚠️ Refresh failed; showing last cached data (may be outdated)."
+                if en else
+                "\n⚠️ 注意:資料更新失敗,以上為上次成功抓取的快取,可能過期。")
     lines.append(src)
     return "\n".join(lines)

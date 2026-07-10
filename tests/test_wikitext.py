@@ -1,6 +1,6 @@
 """wikitext.py:模板清理器,案例全部取自 MapChanges/data/ar 實際內容。"""
 
-from lol_mode_mcp.wikitext import clean_wikitext
+from lol_mode_mcp.wikitext import clean_wikitext, translate_annotations_en
 
 
 def test_ap_is_per_skill_rank():
@@ -95,6 +95,35 @@ def test_file_links_removed_other_links_keep_text():
 def test_bold_and_italic_markers_converted():
     assert clean_wikitext("'''maximum''' health") == "**maximum** health"
     assert clean_wikitext("''Obtained from x.''") == "*Obtained from x.*"
+
+
+def test_piped_link_inside_template_param_not_split():
+    # Ryze Q 實例:type= 裡有 [[File:...|20px|border]],管線不能當參數分隔
+    out = clean_wikitext(
+        "{{pp|type=[[File:Realm Warp.png|20px|border]] ''Realm Warp's'' Rank"
+        "|key=%|10 to 70 for 4|0 to 3}}")
+    assert out.startswith("10−70%")
+    assert "Realm Warp's* Rank" in out
+    assert "File:" not in out and "20px" not in out
+
+
+def test_typed_pp_annotation_translates_to_english():
+    zh = clean_wikitext("{{pp|type=distance traveled|1.5 to 4.5 for 15|0 to 2800}}")
+    assert zh == "1.5−4.5(隨 distance traveled 變化)"
+    assert translate_annotations_en(zh) == \
+        "1.5−4.5 (scales with distance traveled)"
+
+
+def test_annotations_translate_back_to_english():
+    assert translate_annotations_en("70−190(隨技能等級)") == \
+        "70−190 (scales with skill rank)"
+    assert translate_annotations_en("1−1.5(隨等級)") == "1−1.5 (scales with level)"
+    assert translate_annotations_en("近戰 8%/遠程 5%") == "melee 8% / ranged 5%"
+    assert translate_annotations_en("350 金幣") == "350 gold"
+    assert translate_annotations_en("效果半徑 25") == "effect radius 25"
+    # 英文內容不受影響
+    assert translate_annotations_en("Base damage changed to 10.") == \
+        "Base damage changed to 10."
 
 
 def test_full_sentence_from_real_data():
