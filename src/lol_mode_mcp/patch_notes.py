@@ -25,6 +25,7 @@ from . import cache
 from .arena import get_arena_data
 from .champions import get_champions, resolve_champion
 from .http_util import fetch_json
+from .translate import translate_lines
 from .wikitext import clean_wikitext, translate_annotations_en
 
 logger = logging.getLogger(__name__)
@@ -42,10 +43,25 @@ CATEGORY_LABELS = {
     "guests of honor": "貴賓(Guest of Honor)",
     "anvils": "鐵砧",
     "systems": "系統",
+    "summoner spells": "召喚師技能",
+    "runes": "符文",
+    "monsters": "野怪",
 }
+
+# 查詢範圍:patch 頁上的段落。arena/mayhem 是三層 bullet;
+# general(一般對戰)是多個段落、以「;{{ci|英雄}}」為條目。
+SCOPES = {
+    "arena": {"zh": "競技場(Arena)", "en": "Arena"},
+    "general": {"zh": "一般對戰(召喚峽谷)", "en": "General (Summoner's Rift)"},
+    "mayhem": {"zh": "ARAM: Mayhem", "en": "ARAM: Mayhem"},
+}
+_GENERAL_SECTIONS = ["Champions", "Items", "Summoner Spells", "Runes", "Monsters"]
 
 VERSIONS_URL = "https://ddragon.leagueoflegends.com/api/versions.json"
 ITEM_URL = "https://ddragon.leagueoflegends.com/cdn/{ver}/data/{locale}/item.json"
+# ARAM: Mayhem 強化的雙語來源(cdragon 遊戲資料;638 筆、ARAM_ 前綴)
+CHERRY_AUG_URL = ("https://raw.communitydragon.org/latest/plugins/"
+                  "rcp-be-lol-game-data/global/{loc}/v1/cherry-augments.json")
 
 
 # ------------------------------------------------------------ patch 頁清單
@@ -118,7 +134,33 @@ def parse_mode_changes(section: str) -> list[dict]:
     return categories
 
 
-def _fetch_arena_notes(title: str) -> dict:
+def parse_dl_section(section: str) -> list[dict]:
+    """一般對戰段落:「;{{ci|英雄}}」開條目、bullet 是改動內容。"""
+    entries: list[dict] = []
+    cur: dict | None = None
+    for line in section.splitlines():
+        s = line.strip()
+        if s.startswith(";"):
+            name = clean_wikitext(s.lstrip(";").strip())
+            if name:
+                cur = {"name": name, "lines": []}
+                entries.append(cur)
+            continue
+        m = re.match(r"^(\*+)\s*(.*)", s)
+        if not m:
+            continue
+        body = clean_wikitext(m.group(2))
+        if not body:
+            continue
+        if cur is None:
+            cur = {"name": "", "lines": []}
+            entries.append(cur)
+        cur["lines"].append("  " * (len(m.group(1)) - 1) + "- " + body)
+    return entries
+
+
+def _fetch_patch_page(title: str) -> dict:
+    """一次抓 patch 頁,三個 scope 一起解析、一起快取。"""
     raw = fetch_json(WIKI_API, params={
         "action": "query", "prop": "revisions", "rvprop": "content|timestamp",
         "rvslots": "main", "titles": title,
@@ -127,17 +169,31 @@ def _fetch_arena_notes(title: str) -> dict:
     page = raw["query"]["pages"][0]
     if "revisions" not in page:
         raise ValueError(f"patch page {title!r} not found")
-    section = extract_mode_section(page["revisions"][0]["slots"]["main"]["content"])
-    categories = parse_mode_changes(section) if section else []
-    logger.info("patch %s arena notes: %d categories, %d entries",
-                title, len(categories),
-                sum(len(c["entries"]) for c in categories))
-    return {"patch": title, "categories": categories}
+    content = page["revisions"][0]["slots"]["main"]["content"]
+
+    scopes: dict[str, list[dict]] = {}
+    sec = extract_mode_section(content, "Arena")
+    scopes["arena"] = parse_mode_changes(sec) if sec else []
+    sec = extract_mode_section(content, "ARAM: Mayhem")
+    scopes["mayhem"] = parse_mode_changes(sec) if sec else []
+    general = []
+    for name in _GENERAL_SECTIONS:
+        sec = extract_mode_section(content, name)
+        if sec:
+            entries = parse_dl_section(sec)
+            if entries:
+                general.append({"category": name, "entries": entries})
+    scopes["general"] = general
+
+    logger.info("patch %s parsed: arena %d cats / general %d cats / mayhem %d cats",
+                title, len(scopes["arena"]), len(scopes["general"]),
+                len(scopes["mayhem"]))
+    return {"patch": title, "scopes": scopes}
 
 
-def get_arena_notes(title: str) -> cache.CacheResult:
-    return cache.get_cached(f"wiki_patch_arena_{title}",
-                            lambda: _fetch_arena_notes(title))
+def get_patch_data(title: str) -> cache.CacheResult:
+    return cache.get_cached(f"wiki_patch_{title}",
+                            lambda: _fetch_patch_page(title))
 
 
 # ------------------------------------------------------------ 中文查詢翻譯
@@ -161,6 +217,24 @@ def _fetch_item_names() -> dict[str, dict[str, str]]:
 
 def get_item_names() -> cache.CacheResult:
     return cache.get_cached("item_names", _fetch_item_names)
+
+
+def _fetch_mayhem_augment_names() -> dict[str, str]:
+    """cherry-augments.json → {en 名(正規化): 台服名},給 Mayhem scope 用。"""
+    en = fetch_json(CHERRY_AUG_URL.format(loc="default"))
+    zh = fetch_json(CHERRY_AUG_URL.format(loc="zh_tw"))
+    zh_by_id = {a["id"]: a.get("nameTRA", "") for a in zh}
+    mapping = {}
+    for a in en:
+        name_en, name_zh = a.get("nameTRA", ""), zh_by_id.get(a["id"], "")
+        if name_en and name_zh:
+            mapping[_name_key(name_en)] = name_zh
+    logger.info("mayhem augment name map loaded: %d entries", len(mapping))
+    return mapping
+
+
+def get_mayhem_augment_names() -> cache.CacheResult:
+    return cache.get_cached("mayhem_augment_names", _fetch_mayhem_augment_names)
 
 
 def _translate_query(query: str) -> set[str]:
@@ -227,7 +301,13 @@ def _build_localizer() -> dict[str, dict]:
                  for en, zh in get_item_names().data["en_to_zh"].items()}
     except cache.DataUnavailableError:
         pass
-    return {"champions": champs, "augments": augments, "items": items}
+    mayhem: dict[str, str] = {}
+    try:
+        mayhem = get_mayhem_augment_names().data
+    except cache.DataUnavailableError:
+        pass
+    return {"champions": champs, "augments": augments, "items": items,
+            "mayhem_augments": mayhem}
 
 
 # 分類 → 先查哪幾張表(未知分類三張都試)
@@ -236,7 +316,8 @@ _CATEGORY_TABLES = {
     "guests of honor": ["champions"],
     "items": ["items"],
     "anvils": ["items"],
-    "augments": ["augments"],
+    "augments": ["augments", "mayhem_augments"],
+    "summoner spells": ["items"],  # 沒有專屬表,裝備表偶爾命中(如 Flash 類)
 }
 
 
@@ -257,7 +338,7 @@ def localize_entry(name: str, category: str,
 
 
 def enrich_categories(categories: list[dict]) -> list[dict]:
-    """在每個條目補上 nameZh、icon 與 linesEn(網頁中/EN 切換用)。"""
+    """每個條目補 nameZh、icon、linesEn 與 linesZh(規則式翻譯)。"""
     loc = _build_localizer()
     out = []
     for c in categories:
@@ -266,7 +347,8 @@ def enrich_categories(categories: list[dict]) -> list[dict]:
             zh, icon = localize_entry(e["name"], c["category"], loc)
             entries.append({**e, "nameZh": zh, "icon": icon,
                             "linesEn": [translate_annotations_en(ln)
-                                        for ln in e["lines"]]})
+                                        for ln in e["lines"]],
+                            "linesZh": translate_lines(e["lines"])})
         out.append({"category": c["category"], "entries": entries})
     return out
 
@@ -289,16 +371,22 @@ def _filter_categories(categories: list[dict], terms: set[str]) -> list[dict]:
     return out
 
 
-def do_arena_patch_notes(patch: str = "latest", query: str = "",
-                         locale: str = "zh_tw") -> str:
+def do_patch_notes(scope: str = "arena", patch: str = "latest",
+                   query: str = "", locale: str = "zh_tw") -> str:
     en = locale.strip().lower() == "en_us"
+    scope = scope.strip().lower() or "arena"
+    if scope not in SCOPES:
+        return (f"看不懂 scope「{scope}」,可用:arena(競技場,預設)、"
+                f"general(一般對戰)、mayhem(ARAM: Mayhem)。")
+    scope_zh = SCOPES[scope]["zh"]
+    scope_name = SCOPES[scope]["en"] if en else scope_zh
     try:
         titles: list[str] = get_patch_titles().data
     except cache.DataUnavailableError as exc:
         return f"❌ 查詢失敗:無法取得 patch 頁清單(wiki 連線失敗)。技術細節:{exc}"
 
     if patch.strip().lower() in ("", "latest", "最新"):
-        candidates = titles[:4]  # 最新頁可能還沒有 Arena 段落,往前找
+        candidates = titles[:4]  # 最新頁可能還沒有該段落,往前找
     else:
         wanted = normalize_patch(patch)
         if wanted is None:
@@ -313,21 +401,21 @@ def do_arena_patch_notes(patch: str = "latest", query: str = "",
     stale = False
     for title in candidates:
         try:
-            result = get_arena_notes(title)
+            result = get_patch_data(title)
         except cache.DataUnavailableError as exc:
             return f"❌ 查詢失敗:無法取得 {title} 的 patch 頁。技術細節:{exc}"
-        if result.data["categories"]:
+        if result.data["scopes"].get(scope):
             notes = result.data
             stale = result.is_stale
             break
     if notes is None:
         if len(candidates) == 1:
-            return (f"📋 {candidates[0]} 的 patch 頁裡**沒有競技場(Arena)段落**"
-                    f"(該版可能沒有競技場改動)。")
+            return (f"📋 {candidates[0]} 的 patch 頁裡**沒有{scope_zh}段落**"
+                    f"(該版可能沒有此範圍的改動)。")
         return (f"📋 最近幾版({'、'.join(candidates)})的 patch 頁都沒有"
-                f"競技場(Arena)段落。")
+                f"{scope_zh}段落。")
 
-    categories = notes["categories"]
+    categories = notes["scopes"][scope]
     matched_terms: set[str] = set()
     fallback_note = ""
     if query.strip():
@@ -339,10 +427,11 @@ def do_arena_patch_notes(patch: str = "latest", query: str = "",
                 if title == notes["patch"]:
                     continue
                 try:
-                    older = get_arena_notes(title)
+                    older = get_patch_data(title)
                 except cache.DataUnavailableError:
                     break
-                hit = _filter_categories(older.data["categories"], terms)
+                hit = _filter_categories(older.data["scopes"].get(scope, []),
+                                         terms)
                 if hit:
                     fallback_note = (
                         f"No mention of \"{query}\" in {notes['patch']} "
@@ -356,7 +445,7 @@ def do_arena_patch_notes(patch: str = "latest", query: str = "",
         if not filtered:
             cats = "、".join(_category_label(c["category"]) for c in categories)
             terms_hint = "、".join(sorted(terms - {query.strip()}))
-            msg = (f"📋 {notes['patch']} 的競技場改動裡**沒有提到**「{query}」")
+            msg = (f"📋 {notes['patch']} 的{scope_zh}改動裡**沒有提到**「{query}」")
             if terms_hint:
                 msg += f"(也試過英文名:{terms_hint})"
             if len(candidates) > 1:
@@ -366,15 +455,15 @@ def do_arena_patch_notes(patch: str = "latest", query: str = "",
         matched_terms = terms - {query.strip()}
 
     if en:
-        lines = [f"📋 Arena patch changes — {notes['patch']}"]
+        lines = [f"📋 {scope_name} patch changes — {notes['patch']}"]
         if fallback_note:
             lines.insert(0, f"ℹ️ {fallback_note}")
         if query.strip():
             lines.append(f"Showing only entries matching \"{query}\"")
         lines += ["Format: old value ⇒ new value (from the English wiki)", ""]
     else:
-        categories = enrich_categories(categories)  # 補台服名
-        lines = [f"📋 競技場(Arena)patch 改動 — {notes['patch']}"]
+        categories = enrich_categories(categories)  # 補台服名 + 規則式翻譯
+        lines = [f"📋 {scope_zh} patch 改動 — {notes['patch']}"]
         if fallback_note:
             lines.insert(0, f"ℹ️ {fallback_note}")
         if query.strip():
@@ -382,8 +471,7 @@ def do_arena_patch_notes(patch: str = "latest", query: str = "",
             if matched_terms:
                 shown += f"(對應英文:{'、'.join(sorted(matched_terms))})"
             lines.append(f"只顯示與 {shown} 相關的條目")
-        lines += ["改動格式為「舊值 ⇒ 新值」;名稱為台服官方譯名,"
-                  "查無譯名或說明原文保留英文", ""]
+        lines += ["名稱為台服官方譯名;🔤 = 無把握規則翻譯的句子,保留英文原文", ""]
 
     for c in categories:
         lines.append(c["category"] if en
@@ -392,8 +480,10 @@ def do_arena_patch_notes(patch: str = "latest", query: str = "",
             name = e["name"]
             if not en and e.get("nameZh"):
                 name = f"{e['nameZh']} {e['name']}"
-            entry_lines = ([translate_annotations_en(ln) for ln in e["lines"]]
-                           if en else e["lines"])
+            if en:
+                entry_lines = [translate_annotations_en(ln) for ln in e["lines"]]
+            else:
+                entry_lines = e.get("linesZh") or translate_lines(e["lines"])
             if entry_lines:
                 lines.append(f"▸ {name}")
                 lines += ["  " + ln for ln in entry_lines]

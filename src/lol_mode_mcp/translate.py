@@ -1,0 +1,286 @@
+"""規則式英→中翻譯:wiki 改動說明的固定句型 + 台服術語對照表。
+
+**不是機器翻譯。** 只翻「句型解析得出來、術語都在表上」的行;
+翻不完整的行整行保留英文,由呼叫端加 🔤 標記 —— 寧可看英文原文,
+也不要輸出半中半英的難讀句或錯譯(使用者要求正確性優先)。
+
+涵蓋的句型(掃描 MapChanges 與 patch 頁實際內容歸納):
+  X changed to Y [from Z].       → X改為 Y(原為 Z)。
+  X increased to Y [from Z].     → X提高至 Y(原為 Z)。
+  X reduced/decreased to Y ...   → X降低至 Y(原為 Z)。
+  Label: A ⇒ B                   → Label:A ⇒ B(Label 逐詞翻)
+  Disabled. / New Guest of Honor. 等整句特例
+"""
+
+from __future__ import annotations
+
+import re
+
+# ------------------------------------------------------------ 術語表
+# (英文, 台服用語)。比對不分大小寫、長詞優先;英文側是 wiki 慣用寫法。
+GLOSSARY: list[tuple[str, str]] = [
+    ("of target's maximum health", "(佔目標最大生命)"),
+    ("of target's current health", "(佔目標當前生命)"),
+    ("of his maximum health", "(佔自身最大生命)"),
+    ("of her maximum health", "(佔自身最大生命)"),
+    ("base mana regeneration", "基礎魔力回復"),
+    ("base health regeneration", "基礎生命回復"),
+    ("critical strike chance", "爆擊機率"),
+    ("critical strike damage", "爆擊傷害"),
+    ("health regeneration", "生命回復"),
+    ("mana regeneration", "魔力回復"),
+    ("energy restoration", "能量回復"),
+    ("magic resistance", "魔法抗性"),
+    ("magic resist", "魔法抗性"),
+    ("attack damage", "攻擊力"),
+    ("ability power", "法術強度"),
+    ("ability haste", "技能急速"),
+    ("attack speed", "攻擊速度"),
+    ("movement speed", "移動速度"),
+    ("move speed", "移動速度"),
+    ("health growth", "生命成長"),
+    ("mana growth", "魔力成長"),
+    ("health ratio", "生命係數"),
+    ("stun duration", "暈眩時間"),
+    ("root duration", "禁錮時間"),
+    ("slow resist", "緩速抗性"),
+    ("at all ranks", "(全等級)"),
+    ("per stack", "每層"),
+    ("per second", "每秒"),
+    ("per tick", "每跳"),
+    ("per cast", "每次施放"),
+    ("per round", "每回合"),
+    ("per hit", "每次命中"),
+    ("per wave", "每波"),
+    ("per level", "每級"),
+    ("per champion", "每位英雄"),
+    ("per target", "每個目標"),
+    ("per", "每"),
+    ("rounds", "回合"),
+    ("round", "回合"),
+    ("champions", "英雄"),
+    ("champion", "英雄"),
+    ("minions", "小兵"),
+    ("minion", "小兵"),
+    ("monsters", "野怪"),
+    ("monster", "野怪"),
+    ("targets", "目標"),
+    ("target", "目標"),
+    ("empowered", "強化"),
+    ("enhanced", "強化"),
+    ("initial", "初始"),
+    ("additional", "額外"),
+    ("strength", "強度"),
+    ("value", "數值"),
+    ("chance", "機率"),
+    ("effect", "效果"),
+    ("speed", "速度"),
+    ("growth", "成長"),
+    ("penetration", "穿透"),
+    ("resistance", "抗性"),
+    ("reduction", "減免"),
+    ("restoration", "回復"),
+    ("regeneration", "回復"),
+    ("cap", "上限"),
+    ("capped", "上限"),
+    ("missing health", "已損失生命"),
+    ("missing", "損失"),
+    ("resistances", "抗性"),
+    ("turrets", "砲塔"),
+    ("turret", "砲塔"),
+    ("allies", "友軍"),
+    ("ally", "友軍"),
+    ("enemies", "敵方"),
+    ("enemy", "敵方"),
+    ("takedown", "擊殺參與"),
+    ("attacks", "攻擊"),
+    ("attack", "攻擊"),
+    ("active", "主動"),
+    ("self", "自身"),
+    ("refund", "返還"),
+    ("timer", "計時"),
+    ("units", "單位"),
+    ("stats", "屬性"),
+    ("dash", "衝刺"),
+    ("final", "最終"),
+    ("evolved", "進化後"),
+    ("unempowered", "未強化"),
+    ("fury", "怒氣"),
+    ("tibbers", "提貝爾斯"),
+    ("and", "與"),
+    ("true damage", "真實傷害"),
+    ("magic damage", "魔法傷害"),
+    ("physical damage", "物理傷害"),
+    ("base damage", "基礎傷害"),
+    ("base heal", "基礎治療"),
+    ("base shield", "基礎護盾"),
+    ("mana cost", "魔力消耗"),
+    ("energy cost", "能量消耗"),
+    ("cast range", "施放距離"),
+    ("damage reduction", "傷害減免"),
+    ("shield strength", "護盾強度"),
+    ("healing", "治療"),
+    ("heal", "治療"),
+    ("shield", "護盾"),
+    ("cooldown", "冷卻時間"),
+    ("damage", "傷害"),
+    ("maximum", "最大"),
+    ("minimum", "最小"),
+    ("max", "最大"),
+    ("min", "最小"),
+    ("bonus", "額外"),
+    ("total", "總計"),
+    ("base", "基礎"),
+    ("health", "生命"),
+    ("mana", "魔力"),
+    ("energy", "能量"),
+    ("armor", "護甲"),
+    ("omnivamp", "全能吸血"),
+    ("lifesteal", "生命偷取"),
+    ("life steal", "生命偷取"),
+    ("lethality", "致命性"),
+    ("tenacity", "韌性"),
+    ("gold", "金幣"),
+    ("experience", "經驗值"),
+    ("duration", "持續時間"),
+    ("threshold", "門檻"),
+    ("radius", "半徑"),
+    ("range", "範圍"),
+    ("ratio", "係數"),
+    ("stacks", "層數"),
+    ("stack", "層"),
+    ("seconds", "秒"),
+    ("second", "秒"),
+    ("silver", "白銀"),
+    ("prismatic", "稜彩"),
+    ("tier", "稀有度"),
+    ("level", "等級"),
+    ("rank", "等級"),
+    ("slow", "緩速"),
+    ("autocast", "自動施放"),
+    ("execution", "處決"),
+    ("execute", "處決"),
+    ("amp", "增幅"),
+    ("passive", "被動"),
+    ("recipe", "合成配方"),
+    ("revives", "復活次數"),
+    ("revive", "復活"),
+]
+_GLOSS_MAP = {en.lower(): zh for en, zh in GLOSSARY}
+_GLOSS_RE = re.compile(
+    r"\b(" + "|".join(re.escape(en) for en, _ in
+                      sorted(GLOSSARY, key=lambda p: -len(p[0]))) + r")\b",
+    re.I)
+
+# 整句特例
+_WHOLE_LINE = {
+    "disabled.": "已停用。",
+    "disabled": "已停用。",
+    "new guest of honor.": "新登場貴賓。",
+    "removed.": "已移除。",
+}
+
+# 允許殘留的英文 token(不算「沒翻到」):數值單位、鍵位、常見縮寫
+_ALLOWED_WORDS = {"ap", "ad", "hp", "ms", "px", "kda", "vs", "aoe", "buff",
+                  "nerf", "q", "w", "e", "r", "on", "hit"}
+
+_CJK_SPACE_RE = re.compile(r"(?<=[一-鿿])\s+(?=[一-鿿])")
+
+
+def _gloss(text: str) -> str:
+    out = _GLOSS_RE.sub(lambda m: _GLOSS_MAP[m.group(1).lower()], text)
+    return _CJK_SPACE_RE.sub("", out)
+
+
+def _leftover_words(text: str) -> list[str]:
+    words = re.findall(r"[A-Za-z][A-Za-z']+", text)
+    return [w for w in words if w.lower() not in _ALLOWED_WORDS]
+
+
+_STRUCTURES = [
+    (re.compile(r"^(?P<x>.+?) changed to (?P<y>.+?)(?: from (?P<z>.+?))?\.?$",
+                re.I), "改為"),
+    (re.compile(r"^(?P<x>.+?) increased to (?P<y>.+?)(?: from (?P<z>.+?))?\.?$",
+                re.I), "提高至"),
+    (re.compile(r"^(?P<x>.+?) (?:reduced|decreased|lowered) to (?P<y>.+?)"
+                r"(?: from (?P<z>.+?))?\.?$", re.I), "降低至"),
+]
+
+_ARROW_RE = re.compile(r"^(?P<label>[^:：]+)[:：]\s*(?P<vals>.+⇒.+)$")
+
+
+def _looks_like_name(text: str) -> bool:
+    """短、無數字、不成句 → 視為(技能/物品)名稱行,保留原文不標記。"""
+    return (len(text.split()) <= 4 and not re.search(r"\d", text)
+            and not text.endswith("."))
+
+
+def translate_line(text: str, name_map: dict[str, str] | None = None
+                   ) -> tuple[str, bool]:
+    """一行改動說明 → (中文, 是否完整翻譯)。
+
+    不完整時回傳的第一值仍是「原文」(呼叫端自行加 🔤 標記),
+    避免輸出半中半英的句子。name_map(小寫英文名→台服名)給
+    技能/物品名稱行用。
+    """
+    original = text
+    plain = text.replace("**", "").replace("*", "").strip()
+
+    special = _WHOLE_LINE.get(plain.lower())
+    if special:
+        return special, True
+
+    if name_map:
+        hit = name_map.get(plain.lower())
+        if hit:
+            return f"{hit}({plain})", True
+
+    m = _ARROW_RE.match(plain)  # "Label: 15s ⇒ 10s"
+    if m:
+        label = _gloss(m.group("label"))
+        vals = m.group("vals")
+        if "稀有度" in label or "tier" in m.group("label").lower():
+            # 稀有度語境:Gold 是「黃金」階,不是金幣
+            for en, zh in (("Silver", "白銀"), ("Gold", "黃金"),
+                           ("Prismatic", "稜彩")):
+                vals = re.sub(rf"\b{en}\b", zh, vals, flags=re.I)
+        vals = _gloss(vals)
+        if not _leftover_words(label) and not _leftover_words(vals):
+            return f"{label}:{vals}", True
+        return original, False
+
+    for pattern, verb in _STRUCTURES:
+        m = pattern.match(plain)
+        if not m:
+            continue
+        x = _gloss(m.group("x"))
+        y = _gloss(m.group("y"))
+        z = _gloss(m.group("z")) if m.group("z") else None
+        parts_ok = not (_leftover_words(x) or _leftover_words(y)
+                        or (z and _leftover_words(z)))
+        if parts_ok:
+            out = f"{x}{verb} {y}"
+            if z:
+                out += f"(原為 {z})"
+            return out + "。", True
+        return original, False
+
+    if _looks_like_name(plain):
+        return original, True  # 名稱行:保留原文、不算翻譯失敗
+
+    glossed = _gloss(plain)
+    if not _leftover_words(glossed):
+        return glossed, True
+    return original, False
+
+
+def translate_lines(lines: list[str], name_map: dict[str, str] | None = None
+                    ) -> list[str]:
+    """整組行(含 '- ' 前綴與縮排)→ 中文;翻不完整的加 🔤 前綴。"""
+    out = []
+    for line in lines:
+        m = re.match(r"^(\s*- )(.*)$", line)
+        prefix, body = (m.group(1), m.group(2)) if m else ("", line)
+        zh, complete = translate_line(body, name_map)
+        out.append(f"{prefix}{zh}" if complete else f"{prefix}🔤 {body}")
+    return out

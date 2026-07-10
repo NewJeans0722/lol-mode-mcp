@@ -12,6 +12,8 @@
     --line: #26324a;
     --text: #e8e6e3;
     --muted: #8b97a8;
+    --desc: #c9d2de;
+    --faint: #3f4c61;
     --gold: #c8aa6e;
     --gold-bright: #f0d493;
     --buff: #3fd68c;
@@ -20,6 +22,26 @@
     --tier-gold: #e7b03c;
     --prism-a: #7de3ff; --prism-b: #c297ff; --prism-c: #ffc2e0;
     --special: #5ec8b0;
+    --stale-bg: #3a2d12; --stale-line: #6e5320; --stale-text: #e8c778;
+  }
+  body.light {
+    --bg: #f3f1ea;
+    --panel: #ffffff;
+    --panel-2: #ede8dc;
+    --line: #d9d2c2;
+    --text: #2b2620;
+    --muted: #857b68;
+    --desc: #4a4438;
+    --faint: #c8c0ae;
+    --gold: #8a6c2c;
+    --gold-bright: #6d5215;
+    --buff: #1d8f57;
+    --nerf: #c93c3c;
+    --silver: #7d8794;
+    --tier-gold: #b07d14;
+    --prism-a: #2996b8; --prism-b: #8a55d8; --prism-c: #c2578e;
+    --special: #1f8a72;
+    --stale-bg: #fdf3d8; --stale-line: #d9bc72; --stale-text: #7a5c10;
   }
   * { box-sizing: border-box; }
   body {
@@ -94,7 +116,7 @@
   .card .body { min-width: 0; }
   .card h3 { margin: 0; font-size: 16px; }
   .card .en { color: var(--muted); font-size: 12px; margin: 1px 0 6px; }
-  .card .desc { font-size: 13.5px; color: #c9d2de; white-space: pre-line; }
+  .card .desc { font-size: 13.5px; color: var(--desc); white-space: pre-line; }
   .badge {
     display: inline-block; font-size: 11px; padding: 1px 8px; border-radius: 999px;
     margin-left: 6px; vertical-align: 2px; border: 1px solid;
@@ -124,7 +146,7 @@
   td.champ .en { color: var(--muted); font-size: 12px; margin-left: 4px; }
   .buff { color: var(--buff); font-weight: 600; }
   .nerf { color: var(--nerf); font-weight: 600; }
-  .none { color: #3f4c61; }
+  .none { color: var(--faint); }
   label.toggle { color: var(--muted); font-size: 13px; display: flex; gap: 6px; align-items: center; cursor: pointer; }
 
   /* ---- 競技場平衡卡片 ---- */
@@ -149,7 +171,7 @@
   }
   .ab-body { flex: 1; min-width: 0; }
   .ab-n { color: var(--gold); font-size: 12.5px; margin: 3px 0 2px; }
-  .ab ul { margin: 0; padding-left: 18px; font-size: 13px; color: #c9d2de; }
+  .ab ul { margin: 0; padding-left: 18px; font-size: 13px; color: var(--desc); }
   .ab li { margin: 2px 0; }
   .ab li.sub { list-style-type: circle; margin-left: 14px; }
   @media (max-width: 560px) { .agrid { grid-template-columns: 1fr; } }
@@ -170,15 +192,26 @@
   .phead img { width: 32px; height: 32px; border-radius: 6px; flex: none; background: var(--panel-2); }
   .pentry h3 { margin: 0; font-size: 14.5px; }
   .pentry h3 .en { color: var(--muted); font-size: 12px; margin-left: 6px; font-weight: 400; }
-  .pentry ul { margin: 0; padding-left: 18px; font-size: 13px; color: #c9d2de; }
+  .pentry ul { margin: 0; padding-left: 18px; font-size: 13px; color: var(--desc); }
   .pentry li { margin: 2px 0; }
   .pentry li.sub { list-style-type: circle; margin-left: 14px; }
 
   .status { color: var(--muted); padding: 40px 0; text-align: center; }
   .stale {
-    background: #3a2d12; border: 1px solid #6e5320; color: #e8c778;
+    background: var(--stale-bg); border: 1px solid var(--stale-line); color: var(--stale-text);
     border-radius: 8px; padding: 8px 14px; font-size: 13px; margin-bottom: 14px;
   }
+  /* 角色定位篩選(官方職業圖示) */
+  .roles { display: flex; flex-wrap: wrap; gap: 6px; }
+  .role-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 5px 12px 5px 8px; border-radius: 999px; border: 1px solid var(--line);
+    background: var(--panel); color: var(--muted); font-size: 13px; cursor: pointer;
+    font-family: inherit;
+  }
+  .role-chip img { width: 17px; height: 17px; filter: grayscale(60%) opacity(.75); }
+  .role-chip.active { border-color: var(--gold); color: var(--gold-bright); background: var(--panel-2); }
+  .role-chip.active img { filter: none; }
   footer {
     max-width: 1180px; margin: 0 auto; padding: 24px 20px 40px;
     color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--line);
@@ -202,6 +235,7 @@
     <div class="langs">
       <button id="lang-zh" class="active">中</button>
       <button id="lang-en">EN</button>
+      <button id="theme-btn" title="深色/淺色">🌙</button>
     </div>
   </nav>
 </header>
@@ -223,6 +257,7 @@
   <section id="page-arena" hidden>
     <div class="toolbar">
       <input type="search" id="arena-q" placeholder="搜尋英雄(中英文皆可)…">
+      <div class="roles" id="arena-roles"></div>
       <label class="toggle"><input type="checkbox" id="arena-only" checked> 只顯示有調整的英雄</label>
       <span class="count" id="arena-count"></span>
     </div>
@@ -235,7 +270,8 @@
   <section id="page-patch" hidden>
     <div class="toolbar">
       <select id="patch-ver"></select>
-      <input type="search" id="patch-q" placeholder="搜尋強化/英雄/裝備名(英文)…">
+      <div class="chips" id="patch-scopes"></div>
+      <input type="search" id="patch-q" placeholder="搜尋強化/英雄/裝備名(中英文皆可)…">
       <span class="count" id="patch-count"></span>
     </div>
     <div id="patch-stale"></div>
@@ -247,6 +283,7 @@
   <section id="page-aram" hidden>
     <div class="toolbar">
       <input type="search" id="aram-q" placeholder="搜尋英雄(中英文皆可)…">
+      <div class="roles" id="aram-roles"></div>
       <label class="toggle"><input type="checkbox" id="aram-only" checked> 只顯示有調整的英雄</label>
       <span class="count" id="aram-count"></span>
     </div>
@@ -257,11 +294,15 @@
 </main>
 
 <footer>
-  資料來源:<a href="https://communitydragon.org/">CommunityDragon</a>(競技場強化與圖示)、
-  <a href="https://wiki.leagueoflegends.com/">League of Legends Wiki</a>(ARAM/競技場平衡數值,CC BY-SA 4.0)、
-  Riot <a href="https://developer.riotgames.com/docs/lol#data-dragon">Data Dragon</a>(英雄資料)。
-  本站與 <a href="https://github.com/NewJeans0722/lol-mode-mcp">lol-mode-mcp</a> 皆非 Riot Games 官方出品。
-  同一網址亦提供 MCP 服務(<code>/mcp</code>),可加入 Claude 的 Connectors。
+  <p>資料來源:<a href="https://communitydragon.org/">CommunityDragon</a>(競技場強化與圖示)、
+  <a href="https://wiki.leagueoflegends.com/">League of Legends Wiki</a>(平衡數值與 patch 改動,CC BY-SA 4.0)、
+  Riot <a href="https://developer.riotgames.com/docs/lol#data-dragon">Data Dragon</a>(英雄/裝備/技能台服譯名)。
+  同一網址亦提供 MCP 服務(<code>/mcp</code>),可加入 Claude 的 Connectors。</p>
+  <p>📮 聯繫作者:<a href="https://github.com/NewJeans0722">GitHub @NewJeans0722</a> ·
+  問題回報:<a href="https://github.com/NewJeans0722/lol-mode-mcp/issues">lol-mode-mcp Issues</a> ·
+  🤖 本專案與 <a href="https://claude.com/claude-code">Claude</a>(Anthropic)協同開發。</p>
+  <p>本站未經 Riot Games 認可,不代表 Riot Games 或任何官方參與者之觀點或立場。
+  League of Legends 及其相關資產為 Riot Games, Inc. 之商標或註冊商標。</p>
 </footer>
 
 <script>
@@ -299,6 +340,33 @@ function setLang(l) {
 }
 $("lang-zh").onclick = () => setLang("zh");
 $("lang-en").onclick = () => setLang("en");
+
+/* ---------------- 深色/淺色 ---------------- */
+function setTheme(t) {
+  document.body.classList.toggle("light", t === "light");
+  $("theme-btn").textContent = t === "light" ? "☀️" : "🌙";
+  try { localStorage.setItem("theme", t); } catch (e) {}
+}
+$("theme-btn").onclick = () =>
+  setTheme(document.body.classList.contains("light") ? "dark" : "light");
+try { setTheme(localStorage.getItem("theme") || "dark"); } catch (e) {}
+
+/* ---------------- 角色定位篩選(官方職業圖示) ---------------- */
+const ROLE_ICON = (t) => `https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-champion-details/global/default/role-icon-${t.toLowerCase()}.png`;
+const ROLES = [
+  ["Fighter", "戰士"], ["Tank", "坦克"], ["Mage", "法師"],
+  ["Assassin", "刺客"], ["Marksman", "射手"], ["Support", "輔助"],
+];
+state.arenaRole = ""; state.aramRole = "";
+function renderRoleChips(elId, current, onPick) {
+  const zh = state.lang === "zh";
+  $(elId).innerHTML = `<button class="role-chip ${!current ? "active" : ""}" data-r="">${zh ? "全部" : "All"}</button>` +
+    ROLES.map(([tag, label]) => `
+      <button class="role-chip ${current === tag ? "active" : ""}" data-r="${tag}">
+        <img src="${ROLE_ICON(tag)}" alt="">${zh ? label : tag}
+      </button>`).join("");
+  for (const b of $(elId).children) b.onclick = () => onPick(b.dataset.r);
+}
 
 /* ---------------- 海克斯圖鑑 ---------------- */
 async function loadAugments() {
@@ -381,8 +449,11 @@ function renderArena() {
   const q = state.arenaQ.trim().toLowerCase();
   const onlyChanged = $("arena-only").checked;
   const labels = zh ? state.arena.statLabels : state.arena.statLabelsEn;
+  renderRoleChips("arena-roles", state.arenaRole,
+    (r) => { state.arenaRole = r; renderArena(); });
   const list = state.arena.champions.filter((c) =>
     (!onlyChanged || c.stats || c.abilities.length) &&
+    (!state.arenaRole || (c.tags || []).includes(state.arenaRole)) &&
     (!q || (c.nameZh + c.nameEn + c.id).toLowerCase().includes(q)));
   $("arena-count").textContent = `顯示 ${list.length} 位英雄`;
   $("arena-grid").innerHTML = list.map((c) => `
@@ -403,12 +474,29 @@ $("arena-q").oninput = (e) => { state.arenaQ = e.target.value; renderArena(); };
 $("arena-only").onchange = () => renderArena();
 
 /* ---------------- Patch 改動 ---------------- */
+state.patchScope = "arena";
+const SCOPE_TABS = [
+  ["arena", "⚔️ 競技場", "⚔️ Arena"],
+  ["general", "🗺️ 一般對戰", "🗺️ General"],
+  ["mayhem", "🌪️ ARAM Mayhem", "🌪️ Mayhem"],
+];
+function renderScopeChips() {
+  const zh = state.lang === "zh";
+  $("patch-scopes").innerHTML = SCOPE_TABS.map(([s, lzh, len]) =>
+    `<button class="chip ${state.patchScope === s ? "active" : ""}" data-s="${s}">${zh ? lzh : len}</button>`).join("");
+  for (const b of $("patch-scopes").children)
+    b.onclick = () => {
+      state.patchScope = b.dataset.s;
+      loadPatch($("patch-ver").value || "latest");
+    };
+}
 async function loadPatch(ver) {
   $("patch-status").hidden = false;
   $("patch-status").textContent = "載入中…";
   $("patch-content").innerHTML = "";
   try {
-    const r = await fetch("/api/patch-notes?patch=" + encodeURIComponent(ver));
+    const r = await fetch("/api/patch-notes?patch=" + encodeURIComponent(ver) +
+                          "&scope=" + encodeURIComponent(state.patchScope));
     if (!r.ok) throw new Error((await r.json()).error || r.status);
     state.patch = await r.json();
     if (state.patch.stale) $("patch-stale").innerHTML = '<div class="stale">⚠️ 資料源更新失敗,顯示的是上次成功抓取的快取,可能過期。</div>';
@@ -427,6 +515,7 @@ const PCAT_ZH = { "general": "一般", "augments": "強化", "champions": "英�
 function renderPatch() {
   const zh = state.lang === "zh";
   const q = state.patchQ.trim().toLowerCase();
+  renderScopeChips();
   let total = 0;
   const html = state.patch.categories.map((c) => {
     const entries = c.entries.filter((e) =>
@@ -440,7 +529,7 @@ function renderPatch() {
         const title = zh && e.nameZh
           ? `<h3>${esc(e.nameZh)}<span class="en">${richText(e.name)}</span></h3>`
           : `<h3>${richText(e.name)}</h3>`;
-        const lns = zh ? e.lines : (e.linesEn || e.lines);
+        const lns = zh ? (e.linesZh || e.lines) : (e.linesEn || e.lines);
         return `
         <div class="acard pentry">
           <div class="phead">${e.icon ? `<img src="${e.icon}" alt="" loading="lazy">` : ""}${title}</div>
@@ -494,8 +583,11 @@ function fmtCell(v, kind, higherBetter) {
 function renderAram() {
   const q = state.aramQ.trim().toLowerCase();
   const onlyChanged = $("aram-only").checked;
+  renderRoleChips("aram-roles", state.aramRole,
+    (r) => { state.aramRole = r; renderAram(); });
   let rows = state.aram.champions.filter((c) =>
     (!onlyChanged || c.changes) &&
+    (!state.aramRole || (c.tags || []).includes(state.aramRole)) &&
     (!q || (c.nameZh + c.nameEn + c.id).toLowerCase().includes(q)));
   if (state.sortKey) {
     const k = state.sortKey, dir = state.sortDir;

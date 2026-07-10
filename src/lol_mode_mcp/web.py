@@ -13,6 +13,7 @@ arena.py / aram.py 專心維護資料本身,這裡才決定網頁要看到什麼
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 
 from starlette.requests import Request
@@ -25,8 +26,9 @@ from .arena_balance import (AR_STAT_LABELS, AR_STAT_LABELS_EN,
                             ability_zh_name, get_map_changes,
                             group_champion_changes)
 from .champions import get_champions, get_spell_names
+from .translate import translate_lines
 from .wikitext import translate_annotations_en
-from .patch_notes import (enrich_categories, get_arena_notes,
+from .patch_notes import (SCOPES, enrich_categories, get_patch_data,
                           get_patch_titles, normalize_patch)
 
 logger = logging.getLogger(__name__)
@@ -39,10 +41,17 @@ _TIER_SLUG = {0: "silver", 1: "gold", 2: "prismatic", 4: "special"}
 
 async def home(_: Request) -> HTMLResponse:
     try:
-        return HTMLResponse(_INDEX_PATH.read_text(encoding="utf-8"))
+        html = _INDEX_PATH.read_text(encoding="utf-8")
     except OSError as exc:
         logger.error("index.html unreadable: %s", exc)
         return HTMLResponse("<h1>UI 檔案缺失</h1>", status_code=500)
+    # 流量統計(GoatCounter):設了環境變數才注入,程式碼不用改
+    code = os.environ.get("GOATCOUNTER_CODE", "").strip()
+    if code:
+        snippet = (f'<script data-goatcounter="https://{code}.goatcounter.com/count" '
+                   f'async src="//gc.zgo.at/count.js"></script>')
+        html = html.replace("</body>", snippet + "\n</body>")
+    return HTMLResponse(html)
 
 
 async def api_augments(_: Request) -> JSONResponse:
@@ -100,10 +109,11 @@ async def api_arena_balance(_: Request) -> JSONResponse:
                 "titleZh": c.title_zh,
                 "icon": c.icon_url,
                 "stats": ar.get(c.name_en),                # None = 無基礎數值調整
+                "tags": list(c.tags),
                 "abilities": [
                     {"label": label,
                      "labelZh": ability_zh_name(c.id, label, spell_names),
-                     "lines": lines,
+                     "lines": translate_lines(lines),  # 中文(翻不出標 🔤)
                      "linesEn": [translate_annotations_en(ln) for ln in lines]}
                     for label, lines in grouped.get(c.name_en, [])
                 ],
@@ -116,10 +126,13 @@ async def api_arena_balance(_: Request) -> JSONResponse:
 
 async def api_patch_notes(request: Request) -> JSONResponse:
     patch = request.query_params.get("patch", "latest").strip()
+    scope = request.query_params.get("scope", "arena").strip().lower()
+    if scope not in SCOPES:
+        return JSONResponse({"error": f"scope「{scope}」不存在"}, status_code=400)
     try:
         titles = get_patch_titles().data
         if patch.lower() in ("", "latest"):
-            candidates = titles[:4]  # 最新頁可能還沒有 Arena 段落,往前找
+            candidates = titles[:4]  # 最新頁可能還沒有該段落,往前找
         else:
             wanted = normalize_patch(patch)
             if wanted is None or wanted not in titles:
@@ -128,19 +141,20 @@ async def api_patch_notes(request: Request) -> JSONResponse:
             candidates = [wanted]
         notes, stale, fetched = None, False, ""
         for title in candidates:
-            result = get_arena_notes(title)
-            if result.data["categories"] or title == candidates[-1]:
+            result = get_patch_data(title)
+            if result.data["scopes"].get(scope) or title == candidates[-1]:
                 notes, stale, fetched = result.data, result.is_stale, result.fetched_at_str
-                if result.data["categories"]:
+                if result.data["scopes"].get(scope):
                     break
     except cache.DataUnavailableError as exc:
         return JSONResponse({"error": f"資料源連線失敗:{exc}"}, status_code=503)
     return JSONResponse({
         "patch": notes["patch"],
         "patches": titles[:16],  # 給下拉選單
+        "scope": scope,
         "fetched_at": fetched,
         "stale": stale,
-        "categories": enrich_categories(notes["categories"]),  # 補台服名/圖示
+        "categories": enrich_categories(notes["scopes"].get(scope, [])),
     })
 
 
@@ -164,6 +178,7 @@ async def api_aram(_: Request) -> JSONResponse:
                 "nameEn": c.name_en,
                 "titleZh": c.title_zh,
                 "icon": c.icon_url,
+                "tags": list(c.tags),
                 "changes": aram.get(c.name_en),  # None = 本 patch 無調整
             }
             for c in sorted(champs.data, key=lambda c: c.name_en)

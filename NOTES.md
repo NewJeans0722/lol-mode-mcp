@@ -181,6 +181,28 @@ src/lol_mode_mcp/
 
 ## 日誌
 
+- **2026-07-10**(大改版:規則式翻譯 + 一般對戰 + UI 強化):
+  - **translate.py(新)**:規則式英→中翻譯。固定句型(changed to /
+    increased to / reduced to / 「Label: A ⇒ B」)+ 台服術語表(~130 條,
+    GLOSSARY)。**沒把握的整行保留英文 + 🔤 標記**,絕不輸出半中半英。
+    實測覆蓋:MapChanges 技能行 68%、patch 條目 ~5 成(自由句多)。
+    使用者之後回報缺的術語 → 加 GLOSSARY 即可。
+    ⚠️ 「Tier: Gold ⇒ ...」語境 Gold=黃金非金幣,已特判。
+  - **patch_notes 加 scope**:tool 改名 `patch_notes(scope, patch, query,
+    locale)`,scope = arena/general/mayhem。一般對戰段落格式不同
+    (`;{{ci|英雄}}` 開條目,parse_dl_section);Mayhem 段落與 Arena 同格式。
+    一次抓頁三個 scope 一起快取(cache key `wiki_patch_V26.13`)。
+    Mayhem 強化台服名接 cherry-augments.json(nameTRA 欄位,638 筆)。
+  - **網頁**:全域深色/淺色切換(CSS 變數 + localStorage)、
+    角色定位篩選(ddragon tags + cdragon 官方職業圖示
+    `rcp-fe-lol-champion-details/.../role-icon-*.png`,注意該站擋 HEAD
+    請求,要用 GET 驗證)、patch 分頁 scope 切換、footer 聯繫(GitHub
+    only,使用者定案)+ Claude 協同聲明 + Riot 免責。
+  - **流量統計**:環境變數 `GOATCOUNTER_CODE` 有設才在 home() 注入
+    GoatCounter script;使用者要自己去 goatcounter.com 註冊拿 code,
+    然後在 Render dashboard 設 env var(還沒做,等使用者)。
+  - 驗收:92 tests(+10 translate);三 scope API + 角色篩選 + 中文行
+    全部 node/HTTP 實測過。
 - **2026-07-10**(中英雙版本 + 台服名 + 圖示):使用者要求「英文都要有
   對應中文,而且要台服官方譯名(不是機翻),英雄附圖示,做中英兩版本」。
   - **台服名來源(全部是遊戲內字串,不翻譯)**:英雄/裝備 = ddragon

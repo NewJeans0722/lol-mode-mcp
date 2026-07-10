@@ -23,6 +23,7 @@ from .aram import WIKI_API, get_wiki_data
 from .champions import (Champion, get_champions, get_spell_names,
                         resolve_champion)
 from .http_util import fetch_json
+from .translate import translate_lines
 from .wikitext import clean_wikitext, translate_annotations_en
 
 logger = logging.getLogger(__name__)
@@ -238,7 +239,7 @@ def do_arena_balance(champion: str, locale: str = "zh_tw") -> str:
 
     if abilities:
         lines.append("[Ability changes]" if en
-                     else "【技能調整】(取自英文 wiki,術語保留原文)")
+                     else "【技能調整】(🔤 = 無把握規則翻譯的句子,保留英文原文)")
         for label, entry_lines in abilities:
             shown = label
             if en:
@@ -249,6 +250,7 @@ def do_arena_balance(champion: str, locale: str = "zh_tw") -> str:
                 if zh:
                     shown = f"{label} {zh}" if label in ("Q", "W", "E", "R", "被動") \
                         else f"{zh}({label})"
+                entry_lines = translate_lines(entry_lines)
             lines.append(f"▸ {shown}")
             lines += ["  " + ln for ln in entry_lines]
         lines.append("")

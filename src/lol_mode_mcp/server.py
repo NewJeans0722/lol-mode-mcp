@@ -27,7 +27,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 from .aram import do_aram_balance, do_mayhem_balance
 from .arena import do_get_augment, do_list_augments
 from .arena_balance import do_arena_balance
-from .patch_notes import do_arena_patch_notes
+from .patch_notes import do_patch_notes
 
 # logging 一律走 stderr:stdio transport 下 stdout 是 MCP 協定通道,
 # 印任何雜訊到 stdout 都會弄壞協定。
@@ -113,23 +113,24 @@ def arena_balance(champion: str, locale: str = "zh_tw") -> str:
 
 
 @mcp.tool()
-def arena_patch_notes(patch: str = "latest", query: str = "",
-                      locale: str = "zh_tw") -> str:
-    """查詢某一版 patch 的競技場(Arena)改動清單(舊值 ⇒ 新值)。
+def patch_notes(scope: str = "arena", patch: str = "latest", query: str = "",
+                locale: str = "zh_tw") -> str:
+    """查詢某一版 patch 的改動清單(舊值 ⇒ 新值),即「相對上一版的 nerf/buff」。
 
-    涵蓋:強化(Augments)、英雄、裝備、貴賓(Guest of Honor)的
-    數值與機制改動,即「相對上一版的 nerf/buff」。
-    中文版的名稱使用台服官方譯名(ddragon/cdragon 遊戲內字串)。
+    範圍可選競技場(強化/英雄/裝備/貴賓)、一般對戰(召喚峽谷的英雄/裝備/
+    召喚師技能/符文/野怪)或 ARAM: Mayhem。中文版名稱使用台服官方譯名,
+    說明採規則式翻譯(翻不出的保留英文並標 🔤)。
 
     Args:
+        scope: "arena"(競技場,預設)/ "general"(一般對戰)/ "mayhem"。
         patch: "latest"(預設,最新版)或版本號(例:「26.13」、"V26.12")。
         query: 選填,只看特定對象的改動,中英文皆可
                (例:「殞落之祭」、「伊莉絲」、"Eclipse")。
         locale: 回覆語言,"zh_tw"(預設)或 "en_us"。
     """
-    logger.info("tool arena_patch_notes(patch=%r, query=%r, locale=%r)",
-                patch, query, locale)
-    return do_arena_patch_notes(patch, query, locale)
+    logger.info("tool patch_notes(scope=%r, patch=%r, query=%r, locale=%r)",
+                scope, patch, query, locale)
+    return do_patch_notes(scope, patch, query, locale)
 
 
 @mcp.tool()

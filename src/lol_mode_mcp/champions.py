@@ -30,6 +30,7 @@ class Champion:
     name_zh: str   # zh_TW 顯示名,例如 "悟空"
     title_zh: str  # 稱號,例如 "齊天大聖"
     icon_url: str = ""  # ddragon 方形頭像(網頁 UI 用)
+    tags: tuple = ()    # 職業定位(Fighter/Tank/Mage/Assassin/Marksman/Support)
 
 
 def _norm(s: str) -> str:
@@ -50,6 +51,7 @@ def _fetch_champions() -> list[Champion]:
             name_zh=c_zh["name"],
             title_zh=c_zh.get("title", ""),
             icon_url=f"https://ddragon.leagueoflegends.com/cdn/{ver}/img/champion/{cid}.png",
+            tags=tuple(c_en.get("tags", [])),
         ))
     logger.info("champion list loaded: %d champions (ddragon %s)", len(champs), ver)
     return champs
