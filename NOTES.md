@@ -181,6 +181,19 @@ src/lol_mode_mcp/
 
 ## 日誌
 
+- **2026-07-10**(字體調整 + 專有名詞來源確認):
+  - 網頁加字體大小按鈕(A → A+ → A++ → A−,body zoom + localStorage)。
+  - 「米普」加進 GLOSSARY(使用者確認的台服譯名);Chimes 官方譯名
+    未確認,不猜,維持 🔤。
+  - 🔎 **重大發現(未來方向)**:官方繁中 patch notes 可直接抓!
+    `https://www.leagueoflegends.com/zh-tw/news/game-updates/`
+    `league-of-legends-patch-26-13-notes`(26.4 起是這種 slug,
+    26.2/26.3 是 `patch-26-2-notes`;清單可從
+    `/zh-tw/news/tags/patch-notes/` 抓)。**SSR HTML**(不用跑 JS),
+    內容在 `#patch-notes-container`,含米普/亞菲利歐等全部官方翻譯。
+    需帶瀏覽器 User-Agent、follow_redirects(307)。
+    → 若做「官方繁中 patch notes 解析」,規則式翻譯就退居備援;
+    也可半自動比對官方繁中/wiki 英文建術語表。工程量中等,待排程。
 - **2026-07-10**(大改版:規則式翻譯 + 一般對戰 + UI 強化):
   - **translate.py(新)**:規則式英→中翻譯。固定句型(changed to /
     increased to / reduced to / 「Label: A ⇒ B」)+ 台服術語表(~130 條,

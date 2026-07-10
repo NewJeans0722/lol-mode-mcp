@@ -65,6 +65,10 @@
     cursor: pointer; font-family: inherit;
   }
   .langs button.active { color: var(--gold-bright); border-color: var(--gold); }
+  /* 字體大小(zoom 縮放整頁,現代瀏覽器皆支援) */
+  body.fs-lg { zoom: 1.15; }
+  body.fs-xl { zoom: 1.3; }
+  body.fs-sm { zoom: 0.9; }
   nav button {
     background: none; border: none; color: var(--muted); font-size: 15px;
     padding: 10px 18px; cursor: pointer; border-bottom: 2px solid transparent;
@@ -236,6 +240,7 @@
       <button id="lang-zh" class="active">中</button>
       <button id="lang-en">EN</button>
       <button id="theme-btn" title="深色/淺色">🌙</button>
+      <button id="font-btn" title="字體大小">A</button>
     </div>
   </nav>
 </header>
@@ -350,6 +355,21 @@ function setTheme(t) {
 $("theme-btn").onclick = () =>
   setTheme(document.body.classList.contains("light") ? "dark" : "light");
 try { setTheme(localStorage.getItem("theme") || "dark"); } catch (e) {}
+
+/* ---------------- 字體大小 ---------------- */
+const FONT_STEPS = ["", "fs-lg", "fs-xl", "fs-sm"];  // 標準→大→特大→小
+const FONT_LABEL = { "": "A", "fs-lg": "A+", "fs-xl": "A++", "fs-sm": "A−" };
+function setFont(cls) {
+  document.body.classList.remove("fs-sm", "fs-lg", "fs-xl");
+  if (cls) document.body.classList.add(cls);
+  $("font-btn").textContent = FONT_LABEL[cls] || "A";
+  try { localStorage.setItem("fontSize", cls); } catch (e) {}
+}
+$("font-btn").onclick = () => {
+  const cur = FONT_STEPS.find((c) => c && document.body.classList.contains(c)) || "";
+  setFont(FONT_STEPS[(FONT_STEPS.indexOf(cur) + 1) % FONT_STEPS.length]);
+};
+try { setFont(localStorage.getItem("fontSize") || ""); } catch (e) {}
 
 /* ---------------- 角色定位篩選(官方職業圖示) ---------------- */
 const ROLE_ICON = (t) => `https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-champion-details/global/default/role-icon-${t.toLowerCase()}.png`;

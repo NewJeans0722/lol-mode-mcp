@@ -107,6 +107,8 @@ GLOSSARY: list[tuple[str, str]] = [
     ("unempowered", "未強化"),
     ("fury", "怒氣"),
     ("tibbers", "提貝爾斯"),
+    ("meeps", "米普"),
+    ("meep", "米普"),  # 巴德的小精靈,台服官方譯名(使用者確認)
     ("and", "與"),
     ("true damage", "真實傷害"),
     ("magic damage", "魔法傷害"),
