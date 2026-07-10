@@ -15,12 +15,46 @@
 
 使用者已定案的範圍決定:
 - **出裝統計不做**(使用者自己去 op.gg 查),爬蟲偵察中止。
-- 「什麼英雄能抽到什麼海克斯」:**查證過沒有結構化資料源**
-  (cdragon 兩檔案、wiki Module:ArenaAugmentData 都沒有),已向使用者說明。
-- 改動歷史:無 per-augment 結構化 changelog;現值即最新。
 - Mayhem 線索:cherry-augments.json(原始檔)有 638 筆,含 `ARAM_` 前綴
   的 Mayhem 強化;wiki 另有 Module:ArenaAugmentData/data(255 筆,
   英文 description/notes)可做補充註記。
+
+## 競技場擴充路線圖(2026-07-10 偵察完畢,資料源全部驗證過)
+
+使用者要求:競技場數值調整、英雄海克斯限定、完整機制(含投票)、
+相對上一版的 nerf/buff 要寫出來。偵察結論:
+
+1. **競技場每英雄數值調整 — 可做,兩個資料源都驗證過**
+   - 基礎數值:`Module:ChampionData/data` 的 `stats.ar` 區塊(45 英雄),
+     欄位 hp_base/hp_lvl/dam_lvl/arm_lvl/as_lvl(對基礎值/成長值的加減)。
+     `aram.py 的 parse_champion_mode_data(content, 'ar')` 直接可用!
+   - 逐技能調整:`Module:MapChanges/data/ar`(~100KB),格式
+     `["Akali Q"] = [=[ * Base damage changed to {{ap|70 to 190}}. ]=]`,
+     需寫 wikitext 模板清理器({{ap|A to B}}→「A–B(隨等級)」、
+     {{as|X}}→X、{{tip|X}}→X、[[File:...]]→刪)。
+   - 實作:新 tool `arena_balance(champion)` + 網頁第三分頁。
+2. **投票機制 =「Vote Phase / Guests of Honor(貴賓)」— 資料在 Arena 主頁**
+   - wiki 頁 `Arena`(11 萬字)有完整章節:Fame system、Champion select、
+     Battlefields、Round structure、Shop/Combat/Vote Phase、
+     Mode-Specific Changes、Patch History。
+   - Vote Phase:第 2、8 回合前全體傳送到 Reckoner Arena 投票 25 秒,
+     三選一「Guest of Honor」英雄 NPC,套用全大廳永久規則;每位 Guest
+     只出現在特定投票輪(Riven 例外)、每場最多一次。
+   - 實作:充實 mode_mechanics.json(手工整理翻譯)+ 網頁機制分頁;
+     Guests 完整名單在 Arena 頁 Vote Phase 章節後半(尚未逐一抽出)。
+3. **海克斯英雄限定 — 仍無結構化資料源(再次確認)**
+   - Arena 頁與 Arena/Augments 頁都沒有 per-champion eligibility;
+     遊戲內規則(如一轉就贏只給有旋轉技能的英雄)未公開。
+   - 能做的:強化說明本身已自述條件(「你的旋轉類技能…」);
+     在 UI 上標注「此類強化依英雄技能組決定是否出現」。
+4. **相對上一版的改動 — 資料源:wiki 各 patch 頁(V26.x)+ Arena 頁
+   Patch History 章節**;逐 patch 的 Arena 段落可解析成 changelog。
+   使用者提到的裝備「伊卡西亞殞落」在 items.json 找不到
+   (最接近:3430「殞落之祭」= Rite of Ruin,競技場道具),
+   **待向使用者確認正確名稱**。
+5. 雜項:`{{ 字串表引用 }}` bug 已修(formatting.py `_STRING_TABLE`,
+   新引用的查法:cdragon `game/zh_cn/data/menu/en_us/lol.stringtable.json`
+   的 entries,key 小寫;zh_tw 不存在,需手工繁化)。
 
 - ✅ 專案骨架(uv + src layout + console script `lol-mode-mcp`)
 - ✅ `get_augment` / `list_augments`(競技場強化,中英雙語搜尋)
