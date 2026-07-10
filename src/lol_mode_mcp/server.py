@@ -132,6 +132,16 @@ def mode_mechanics() -> str:
                           ensure_ascii=False)
 
 
+# ---------------------------------------------------------------- 網頁介面
+# 同一個 HTTP server 順便掛查詢網頁(給人用)與 JSON API(給網頁的 JS 用);
+# MCP 客戶端仍走 /mcp,互不干擾。stdio 模式下這些路由不存在。
+from .web import api_aram, api_augments, home  # noqa: E402
+
+mcp.custom_route("/", methods=["GET"])(home)
+mcp.custom_route("/api/augments", methods=["GET"])(api_augments)
+mcp.custom_route("/api/aram", methods=["GET"])(api_aram)
+
+
 def main() -> None:
     transport = os.environ.get("MCP_TRANSPORT", "stdio").strip().lower()
     if transport in ("http", "streamable-http", "streamable_http"):

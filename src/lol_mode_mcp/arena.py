@@ -40,6 +40,10 @@ _TIER_ALIASES = {
 }
 
 
+# CommunityDragon 直接掛出遊戲內圖檔,JSON 的 iconLarge 路徑接在這個底下就是圖片網址
+ASSET_BASE = "https://raw.communitydragon.org/latest/game/"
+
+
 @dataclass
 class Augment:
     id: int
@@ -49,6 +53,11 @@ class Augment:
     name_en: str
     desc_zh: str  # 已代入數值、清完標籤的純文字
     desc_en: str
+    icon_path: str = ""  # 例:assets/ux/cherry/augments/icons/adapt_large.png
+
+    @property
+    def icon_url(self) -> str:
+        return ASSET_BASE + self.icon_path.lower() if self.icon_path else ""
 
     def name(self, locale: str) -> str:
         return self.name_zh if locale == "zh_tw" else self.name_en
@@ -111,6 +120,7 @@ def _fetch_arena_data() -> ArenaData:
             desc_zh=render_description(
                 _pick_text(raw_zh), raw_zh.get("dataValues", dv),
                 raw_zh.get("calculations", calc)),
+            icon_path=raw_en.get("iconLarge", ""),
         ))
     logger.info("arena data loaded: %d augments, patch %s", len(augments), patch)
     return ArenaData(augments=augments, patch=patch)

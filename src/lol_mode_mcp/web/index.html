@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LoL 模式資料庫 — 競技場海克斯 & ARAM 平衡</title>
+<style>
+  :root {
+    --bg: #0a0e14;
+    --panel: #111823;
+    --panel-2: #171f2e;
+    --line: #26324a;
+    --text: #e8e6e3;
+    --muted: #8b97a8;
+    --gold: #c8aa6e;
+    --gold-bright: #f0d493;
+    --buff: #3fd68c;
+    --nerf: #ff6b6b;
+    --silver: #9aa4af;
+    --tier-gold: #e7b03c;
+    --prism-a: #7de3ff; --prism-b: #c297ff; --prism-c: #ffc2e0;
+    --special: #5ec8b0;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Segoe UI", "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif;
+    line-height: 1.55;
+  }
+  header {
+    padding: 28px 20px 0; max-width: 1180px; margin: 0 auto;
+  }
+  h1 { margin: 0 0 4px; font-size: 26px; letter-spacing: .5px; }
+  h1 .gold { color: var(--gold-bright); }
+  .sub { color: var(--muted); font-size: 14px; margin: 0 0 18px; }
+  .sub .patch { color: var(--gold); font-weight: 600; }
+
+  nav { display: flex; gap: 8px; border-bottom: 1px solid var(--line); }
+  nav button {
+    background: none; border: none; color: var(--muted); font-size: 15px;
+    padding: 10px 18px; cursor: pointer; border-bottom: 2px solid transparent;
+    font-family: inherit;
+  }
+  nav button.active { color: var(--gold-bright); border-bottom-color: var(--gold); }
+  nav button:hover { color: var(--text); }
+
+  main { max-width: 1180px; margin: 0 auto; padding: 18px 20px 40px; }
+
+  .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 18px; }
+  input[type="search"] {
+    flex: 1 1 260px; max-width: 420px; padding: 10px 14px; font-size: 15px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    color: var(--text); outline: none; font-family: inherit;
+  }
+  input[type="search"]:focus { border-color: var(--gold); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line);
+    background: var(--panel); color: var(--muted); font-size: 13px; cursor: pointer;
+    font-family: inherit;
+  }
+  .chip.active { border-color: var(--gold); color: var(--gold-bright); background: var(--panel-2); }
+  .count { color: var(--muted); font-size: 13px; margin-left: auto; }
+
+  /* ---- 強化卡片 ---- */
+  .grid {
+    display: grid; gap: 12px;
+    grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+  }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 14px; display: flex; gap: 12px; position: relative; overflow: hidden;
+  }
+  .card::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  }
+  .card.silver::before { background: var(--silver); }
+  .card.gold::before { background: var(--tier-gold); }
+  .card.prismatic::before {
+    background: linear-gradient(180deg, var(--prism-a), var(--prism-b), var(--prism-c));
+  }
+  .card.special::before { background: var(--special); }
+  .card img {
+    width: 56px; height: 56px; border-radius: 8px; flex: none;
+    background: var(--panel-2); object-fit: contain;
+  }
+  .card .body { min-width: 0; }
+  .card h3 { margin: 0; font-size: 16px; }
+  .card .en { color: var(--muted); font-size: 12px; margin: 1px 0 6px; }
+  .card .desc { font-size: 13.5px; color: #c9d2de; white-space: pre-line; }
+  .badge {
+    display: inline-block; font-size: 11px; padding: 1px 8px; border-radius: 999px;
+    margin-left: 6px; vertical-align: 2px; border: 1px solid;
+  }
+  .badge.silver { color: var(--silver); border-color: var(--silver); }
+  .badge.gold { color: var(--tier-gold); border-color: var(--tier-gold); }
+  .badge.prismatic {
+    border-color: var(--prism-b); color: var(--prism-a);
+    background: linear-gradient(90deg, rgba(125,227,255,.08), rgba(194,151,255,.08));
+  }
+  .badge.special { color: var(--special); border-color: var(--special); }
+
+  /* ---- ARAM 表 ---- */
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
+  table { border-collapse: collapse; width: 100%; min-width: 860px; font-size: 14px; }
+  th, td { padding: 8px 12px; text-align: center; white-space: nowrap; }
+  th {
+    background: var(--panel-2); color: var(--muted); font-weight: 600; cursor: pointer;
+    position: sticky; top: 0; user-select: none;
+  }
+  th:hover { color: var(--gold-bright); }
+  th .arrow { font-size: 10px; }
+  tbody tr { border-top: 1px solid var(--line); background: var(--panel); }
+  tbody tr:hover { background: var(--panel-2); }
+  td.champ { text-align: left; }
+  td.champ img { width: 32px; height: 32px; border-radius: 6px; vertical-align: middle; margin-right: 8px; }
+  td.champ .en { color: var(--muted); font-size: 12px; margin-left: 4px; }
+  .buff { color: var(--buff); font-weight: 600; }
+  .nerf { color: var(--nerf); font-weight: 600; }
+  .none { color: #3f4c61; }
+  label.toggle { color: var(--muted); font-size: 13px; display: flex; gap: 6px; align-items: center; cursor: pointer; }
+
+  .status { color: var(--muted); padding: 40px 0; text-align: center; }
+  .stale {
+    background: #3a2d12; border: 1px solid #6e5320; color: #e8c778;
+    border-radius: 8px; padding: 8px 14px; font-size: 13px; margin-bottom: 14px;
+  }
+  footer {
+    max-width: 1180px; margin: 0 auto; padding: 24px 20px 40px;
+    color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--line);
+  }
+  footer a { color: var(--gold); text-decoration: none; }
+  @media (max-width: 640px) {
+    .grid { grid-template-columns: 1fr; }
+    h1 { font-size: 21px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>LoL <span class="gold">模式資料庫</span></h1>
+  <p class="sub" id="meta">載入中…</p>
+  <nav>
+    <button id="tab-aug" class="active">🌈 競技場海克斯圖鑑</button>
+    <button id="tab-aram">🏔️ ARAM 平衡表</button>
+  </nav>
+</header>
+
+<main>
+  <!-- 海克斯圖鑑 -->
+  <section id="page-aug">
+    <div class="toolbar">
+      <input type="search" id="aug-q" placeholder="搜尋強化名稱或效果(中英文皆可)…">
+      <div class="chips" id="aug-chips"></div>
+      <span class="count" id="aug-count"></span>
+    </div>
+    <div id="aug-stale"></div>
+    <div class="grid" id="aug-grid"></div>
+    <div class="status" id="aug-status">載入中…(伺服器若在休眠,喚醒約需 30~60 秒)</div>
+  </section>
+
+  <!-- ARAM -->
+  <section id="page-aram" hidden>
+    <div class="toolbar">
+      <input type="search" id="aram-q" placeholder="搜尋英雄(中英文皆可)…">
+      <label class="toggle"><input type="checkbox" id="aram-only" checked> 只顯示有調整的英雄</label>
+      <span class="count" id="aram-count"></span>
+    </div>
+    <div id="aram-stale"></div>
+    <div class="table-wrap"><table id="aram-table"></table></div>
+    <div class="status" id="aram-status">切到此分頁時載入…</div>
+  </section>
+</main>
+
+<footer>
+  資料來源:<a href="https://communitydragon.org/">CommunityDragon</a>(競技場強化與圖示)、
+  <a href="https://wiki.leagueoflegends.com/">League of Legends Wiki</a>(ARAM 數值,CC BY-SA 4.0)、
+  Riot <a href="https://developer.riotgames.com/docs/lol#data-dragon">Data Dragon</a>(英雄資料)。
+  本站與 <a href="https://github.com/NewJeans0722/lol-mode-mcp">lol-mode-mcp</a> 皆非 Riot Games 官方出品。
+  同一網址亦提供 MCP 服務(<code>/mcp</code>),可加入 Claude 的 Connectors。
+</footer>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const TIERS = [
+  ["all", "全部"], ["prismatic", "稜彩"], ["gold", "黃金"],
+  ["silver", "白銀"], ["special", "特殊"],
+];
+const state = { augs: null, aram: null, tier: "all", augQ: "", aramQ: "", sortKey: null, sortDir: -1 };
+
+/* ---------------- 分頁切換 ---------------- */
+function showTab(which) {
+  $("page-aug").hidden = which !== "aug";
+  $("page-aram").hidden = which !== "aram";
+  $("tab-aug").classList.toggle("active", which === "aug");
+  $("tab-aram").classList.toggle("active", which === "aram");
+  if (which === "aram" && !state.aram) loadAram();
+}
+$("tab-aug").onclick = () => showTab("aug");
+$("tab-aram").onclick = () => showTab("aram");
+
+/* ---------------- 海克斯圖鑑 ---------------- */
+async function loadAugments() {
+  try {
+    const r = await fetch("/api/augments");
+    if (!r.ok) throw new Error((await r.json()).error || r.status);
+    state.augs = await r.json();
+    $("meta").innerHTML = `patch <span class="patch">${state.augs.patch}</span> · 資料更新 ${state.augs.fetched_at} · ${state.augs.augments.length} 個強化`;
+    if (state.augs.stale) $("aug-stale").innerHTML = '<div class="stale">⚠️ 資料源更新失敗,顯示的是上次成功抓取的快取,可能過期。</div>';
+    $("aug-status").hidden = true;
+    renderChips(); renderAugs();
+  } catch (e) {
+    $("aug-status").textContent = "載入失敗:" + e.message + "(重新整理再試一次)";
+  }
+}
+function renderChips() {
+  const counts = { all: state.augs.augments.length };
+  for (const a of state.augs.augments) counts[a.tier] = (counts[a.tier] || 0) + 1;
+  $("aug-chips").innerHTML = TIERS.map(([slug, zh]) =>
+    `<button class="chip ${state.tier === slug ? "active" : ""}" data-t="${slug}">${zh} ${counts[slug] || 0}</button>`).join("");
+  for (const b of $("aug-chips").children)
+    b.onclick = () => { state.tier = b.dataset.t; renderChips(); renderAugs(); };
+}
+const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+function renderAugs() {
+  const q = state.augQ.trim().toLowerCase();
+  const list = state.augs.augments.filter((a) =>
+    (state.tier === "all" || a.tier === state.tier) &&
+    (!q || (a.nameZh + a.nameEn + a.descZh + a.descEn).toLowerCase().includes(q)));
+  $("aug-count").textContent = `顯示 ${list.length} 個`;
+  $("aug-grid").innerHTML = list.map((a) => `
+    <div class="card ${a.tier}">
+      ${a.icon ? `<img src="${a.icon}" alt="" loading="lazy">` : ""}
+      <div class="body">
+        <h3>${esc(a.nameZh)}<span class="badge ${a.tier}">${esc(a.tierZh)}</span></h3>
+        <div class="en">${esc(a.nameEn)}</div>
+        <div class="desc">${esc(a.descZh)}</div>
+      </div>
+    </div>`).join("");
+}
+$("aug-q").oninput = (e) => { state.augQ = e.target.value; renderAugs(); };
+
+/* ---------------- ARAM 平衡表 ---------------- */
+async function loadAram() {
+  try {
+    const r = await fetch("/api/aram");
+    if (!r.ok) throw new Error((await r.json()).error || r.status);
+    state.aram = await r.json();
+    if (state.aram.stale) $("aram-stale").innerHTML = '<div class="stale">⚠️ 資料源更新失敗,顯示的是上次成功抓取的快取,可能過期。</div>';
+    $("aram-status").hidden = true;
+    renderAram();
+  } catch (e) {
+    $("aram-status").textContent = "載入失敗:" + e.message;
+  }
+}
+// 欄位順序與呈現:mult 欄顯示 ±%,flat 欄顯示 ±N
+const ARAM_COLS = [
+  ["dmg_dealt", "mult", true], ["dmg_taken", "mult", false], ["healing", "mult", true],
+  ["shielding", "mult", true], ["ability_haste", "flat", true], ["total_as", "mult", true],
+  ["tenacity", "mult", true], ["energyregen_mod", "mult", true],
+];
+function cellVal(changes, key) { return changes ? changes[key] : undefined; }
+function fmtCell(v, kind, higherBetter) {
+  if (v === undefined || v === null || (kind === "mult" && v === 1) || (kind === "flat" && v === 0))
+    return '<td class="none">—</td>';
+  let text, isBuff;
+  if (kind === "mult") {
+    const pct = Math.round((v - 1) * 1000) / 10;
+    text = (pct > 0 ? "+" : "") + pct + "%";
+    isBuff = (v > 1) === higherBetter;
+  } else {
+    text = (v > 0 ? "+" : "") + v;
+    isBuff = (v > 0) === higherBetter;
+  }
+  return `<td class="${isBuff ? "buff" : "nerf"}">${text}</td>`;
+}
+function renderAram() {
+  const q = state.aramQ.trim().toLowerCase();
+  const onlyChanged = $("aram-only").checked;
+  let rows = state.aram.champions.filter((c) =>
+    (!onlyChanged || c.changes) &&
+    (!q || (c.nameZh + c.nameEn + c.id).toLowerCase().includes(q)));
+  if (state.sortKey) {
+    const k = state.sortKey, dir = state.sortDir;
+    const [, kind] = ARAM_COLS.find(([key]) => key === k) || [];
+    const base = kind === "flat" ? 0 : 1;
+    // dir = -1 由大到小(▼),+1 由小到大(▲)
+    rows = rows.slice().sort((a, b) =>
+      dir * (((cellVal(a.changes, k) ?? base)) - ((cellVal(b.changes, k) ?? base))));
+  }
+  $("aram-count").textContent = `顯示 ${rows.length} 位英雄`;
+  const labels = state.aram.fields;
+  const head = "<tr><th data-k=''>英雄</th>" + ARAM_COLS.map(([k]) =>
+    `<th data-k="${k}">${labels[k] || k}${state.sortKey === k ? `<span class="arrow"> ${state.sortDir > 0 ? "▲" : "▼"}</span>` : ""}</th>`).join("") + "</tr>";
+  const body = rows.map((c) => `
+    <tr>
+      <td class="champ"><img src="${c.icon}" alt="" loading="lazy">${esc(c.nameZh)}<span class="en">${esc(c.nameEn)}</span></td>
+      ${ARAM_COLS.map(([k, kind, hb]) => fmtCell(cellVal(c.changes, k), kind, hb)).join("")}
+    </tr>`).join("");
+  $("aram-table").innerHTML = head + body;
+  for (const th of $("aram-table").querySelectorAll("th")) {
+    th.onclick = () => {
+      const k = th.dataset.k;
+      if (!k) return;
+      state.sortDir = state.sortKey === k ? -state.sortDir : -1;
+      state.sortKey = k;
+      renderAram();
+    };
+  }
+}
+$("aram-q").oninput = (e) => { state.aramQ = e.target.value; renderAram(); };
+$("aram-only").onchange = () => renderAram();
+
+loadAugments();
+</script>
+</body>
+</html>

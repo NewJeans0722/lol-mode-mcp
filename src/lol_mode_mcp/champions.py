@@ -28,6 +28,7 @@ class Champion:
     name_en: str   # 英文顯示名,例如 "Wukong"(= wiki 的 key)
     name_zh: str   # zh_TW 顯示名,例如 "悟空"
     title_zh: str  # 稱號,例如 "齊天大聖"
+    icon_url: str = ""  # ddragon 方形頭像(網頁 UI 用)
 
 
 def _norm(s: str) -> str:
@@ -47,6 +48,7 @@ def _fetch_champions() -> list[Champion]:
             name_en=c_en["name"],
             name_zh=c_zh["name"],
             title_zh=c_zh.get("title", ""),
+            icon_url=f"https://ddragon.leagueoflegends.com/cdn/{ver}/img/champion/{cid}.png",
         ))
     logger.info("champion list loaded: %d champions (ddragon %s)", len(champs), ver)
     return champs
