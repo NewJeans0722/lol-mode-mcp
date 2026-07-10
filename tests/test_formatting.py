@@ -40,6 +40,26 @@ def test_br_and_tags_stripped():
     assert render_description(text, {}) == "第一行\n\n規則文字"
 
 
+def test_inline_keyword_ref_resolved():
+    text = "普攻會朝額外一名目標射出箭矢，並附加{{ Item_Keyword_OnHit }}。"
+    assert render_description(text, {}) == "普攻會朝額外一名目標射出箭矢，並附加攻擊特效。"
+
+
+def test_whole_desc_ref_with_teamsize_variant():
+    out = render_description("{{ Cherry_Vengeance@TeamSize@_Summary }}", {})
+    assert "友軍陣亡" in out and "{{" not in out
+
+
+def test_ref_placeholders_still_substituted():
+    out = render_description("{{ Cherry_SpinToWin_Summary }}",
+                             {"SpinHaste": [20.0], "SpinDamageAmp": [0.12]})
+    assert "20" in out and "12%" in out and "@" not in out
+
+
+def test_unknown_ref_stripped():
+    assert render_description("效果{{ Cherry_Unknown_Thing }}結束", {}) == "效果結束"
+
+
 def test_sprite_markup_removed():
     assert render_description("獲得一件%i:Augment%金色增幅裝置。", {}) == "獲得一件金色增幅裝置。"
 
