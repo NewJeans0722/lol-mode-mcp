@@ -181,6 +181,25 @@ src/lol_mode_mcp/
 
 ## 日誌
 
+- **2026-07-11**(官方繁中 patch notes 上線 = patch 改動全中文化):
+  使用者要求把 🔤 全部消掉(中文版不要再有英文句)。
+  - **official_notes.py(新)**:解析 Riot 官方繁中 patch notes,
+    中文版 patch_notes(三個 scope)直接用官方原文 —— 專有名詞全對
+    (咒法/升級收藏家/風險計算這些 cdragon 沒有的都有了),不再需要
+    規則式翻譯。EN 版維持 wiki。抓不到官方頁(太舊/斷線)退回
+    wiki+規則翻譯。網頁 API 加 categoriesZh(官方版含英雄圖示),
+    zh 模式優先渲染,計數列顯示「官方繁中原文」。
+  - 解析要點:內容在 #patch-notes-container(SSR);token 掃描
+    h2(段落:競技場/英雄/道具/大混戰,其餘忽略)→ h4(競技場式分類)
+    / h3(一般對戰英雄)→ `<p><strong>條目</strong></p>`+`<li>`。
+    ⚠️ 標籤都帶 style 屬性,regex 要 `[^>]*`。slug 兩種格式都試。
+  - ⚠️ 官方 zh 行不可再過 translate_lines(含 Discord/Buff 等英文詞
+    會被誤標 🔤),直接掛 linesZh。
+  - 🔎 發現 Riot 兩個官方來源譯名會不一致:遊戲內「編鐘」vs
+    官方 notes「調和之音」(巴德 Chimes)—— 專案標準:遊戲內字串優先。
+  - **剩餘 🔤 只在 arena_balance(MapChanges)**:無官方中文,
+    規則翻譯 68%;其餘計畫由 Claude 逐句翻譯建 overrides 對照檔
+    (下一步,尚未做)。
 - **2026-07-10**(字體調整 + 專有名詞來源確認):
   - 網頁加字體大小按鈕(A → A+ → A++ → A−,body zoom + localStorage)。
   - 「米普」加進 GLOSSARY(使用者確認的台服譯名);Chimes 官方譯名

@@ -28,6 +28,7 @@ from .arena_balance import (AR_STAT_LABELS, AR_STAT_LABELS_EN,
 from .champions import get_champions, get_spell_names
 from .translate import translate_lines
 from .wikitext import translate_annotations_en
+from .official_notes import get_official_zh
 from .patch_notes import (SCOPES, enrich_categories, get_patch_data,
                           get_patch_titles, normalize_patch)
 
@@ -148,6 +149,28 @@ async def api_patch_notes(request: Request) -> JSONResponse:
                     break
     except cache.DataUnavailableError as exc:
         return JSONResponse({"error": f"資料源連線失敗:{exc}"}, status_code=503)
+
+    # 中文版:Riot 官方繁中 patch notes 原文(抓不到就 null,前端退回規則翻譯)
+    categories_zh = None
+    try:
+        off = get_official_zh(notes["patch"])
+        official = off.data["scopes"].get(scope)
+        if official:
+            zh_champs = {c.name_zh: c for c in get_champions().data}
+            categories_zh = [{
+                "category": c["category"],
+                "entries": [{
+                    "name": e["name"],
+                    "nameEn": (zh_champs[e["name"]].name_en
+                               if e["name"] in zh_champs else None),
+                    "icon": (zh_champs[e["name"]].icon_url
+                             if e["name"] in zh_champs else None),
+                    "lines": e["lines"],
+                } for e in c["entries"]],
+            } for c in official]
+    except Exception as exc:  # noqa: BLE001 — 官方頁失敗不影響主資料
+        logger.warning("official zh notes unavailable: %s", exc)
+
     return JSONResponse({
         "patch": notes["patch"],
         "patches": titles[:16],  # 給下拉選單
@@ -155,6 +178,7 @@ async def api_patch_notes(request: Request) -> JSONResponse:
         "fetched_at": fetched,
         "stale": stale,
         "categories": enrich_categories(notes["scopes"].get(scope, [])),
+        "categoriesZh": categories_zh,
     })
 
 

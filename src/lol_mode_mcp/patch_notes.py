@@ -25,6 +25,7 @@ from . import cache
 from .arena import get_arena_data
 from .champions import get_champions, resolve_champion
 from .http_util import fetch_json
+from .official_notes import get_official_zh
 from .translate import translate_lines
 from .wikitext import clean_wikitext, translate_annotations_en
 
@@ -360,6 +361,29 @@ def _category_label(cat: str) -> str:
     return f"{zh} {cat}" if zh else cat
 
 
+def _query_zh_terms(query: str, terms_en: set[str]) -> set[str]:
+    """查詢字(中或英)→ 用來過濾官方中文條目名的詞集合。"""
+    zh_terms = {query}
+    loc = _build_localizer()
+    for term in terms_en | {query}:
+        key = _name_key(term)
+        for kind, table in loc.items():
+            hit = table.get(key)
+            if hit:
+                zh_terms.add(hit[0] if kind == "champions" else hit)
+    return {t for t in zh_terms if t}
+
+
+def _filter_official(categories: list[dict], zh_terms: set[str]) -> list[dict]:
+    out = []
+    for c in categories:
+        entries = [e for e in c["entries"]
+                   if any(t in e["name"] for t in zh_terms)]
+        if entries:
+            out.append({"category": c["category"], "entries": entries})
+    return out
+
+
 def _filter_categories(categories: list[dict], terms: set[str]) -> list[dict]:
     lows = {t.lower() for t in terms}
     out = []
@@ -454,6 +478,7 @@ def do_patch_notes(scope: str = "arena", patch: str = "latest",
         categories = filtered
         matched_terms = terms - {query.strip()}
 
+    official = None
     if en:
         lines = [f"📋 {scope_name} patch changes — {notes['patch']}"]
         if fallback_note:
@@ -462,7 +487,18 @@ def do_patch_notes(scope: str = "arena", patch: str = "latest",
             lines.append(f"Showing only entries matching \"{query}\"")
         lines += ["Format: old value ⇒ new value (from the English wiki)", ""]
     else:
-        categories = enrich_categories(categories)  # 補台服名 + 規則式翻譯
+        # 中文優先用 Riot 官方繁中 patch notes 原文(正宗台服翻譯);
+        # 抓不到(太舊/改版/斷線)才退回 wiki + 規則式翻譯。
+        try:
+            off = get_official_zh(notes["patch"])
+            official = off.data["scopes"].get(scope) or None
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("official zh notes unavailable for %s: %s",
+                           notes["patch"], exc)
+        if official and query.strip():
+            official = _filter_official(
+                official, _query_zh_terms(query.strip(), matched_terms)) or None
+
         lines = [f"📋 {scope_zh} patch 改動 — {notes['patch']}"]
         if fallback_note:
             lines.insert(0, f"ℹ️ {fallback_note}")
@@ -471,7 +507,17 @@ def do_patch_notes(scope: str = "arena", patch: str = "latest",
             if matched_terms:
                 shown += f"(對應英文:{'、'.join(sorted(matched_terms))})"
             lines.append(f"只顯示與 {shown} 相關的條目")
-        lines += ["名稱為台服官方譯名;🔤 = 無把握規則翻譯的句子,保留英文原文", ""]
+        if official:
+            # 官方中文原文直接當 linesZh,不再過規則式翻譯(避免誤標 🔤)
+            categories = [{"category": c["category"],
+                           "entries": [{**e, "linesZh": e["lines"]}
+                                       for e in c["entries"]]}
+                          for c in official]
+            lines += ["改動內容取自 Riot 官方繁中 patch notes 原文", ""]
+        else:
+            categories = enrich_categories(categories)  # wiki + 規則式翻譯
+            lines += ["名稱為台服官方譯名;🔤 = 無把握規則翻譯的句子,"
+                      "保留英文原文", ""]
 
     for c in categories:
         lines.append(c["category"] if en
@@ -491,8 +537,12 @@ def do_patch_notes(scope: str = "arena", patch: str = "latest",
                 lines.append(f"- {name}")  # 無子項的單行改動
         lines.append("")
 
-    src = ("📌 Source: LoL Wiki (CC BY-SA)" if en
-           else "📌 資料:LoL Wiki(CC BY-SA)")
+    if en:
+        src = "📌 Source: LoL Wiki (CC BY-SA)"
+    elif official:
+        src = "📌 資料:Riot 官方繁中 patch notes(結構)+ LoL Wiki(CC BY-SA)"
+    else:
+        src = "📌 資料:LoL Wiki(CC BY-SA)"
     if patch.strip().lower() in ("", "latest", "最新"):
         others = [t for t in titles[:5] if t != notes["patch"]]
         if others:

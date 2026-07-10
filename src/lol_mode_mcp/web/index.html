@@ -537,19 +537,27 @@ function renderPatch() {
   const q = state.patchQ.trim().toLowerCase();
   renderScopeChips();
   let total = 0;
-  const html = state.patch.categories.map((c) => {
+  // 中文版優先用 Riot 官方繁中原文(categoriesZh);沒有才用 wiki+規則翻譯
+  const official = zh && state.patch.categoriesZh;
+  const cats = official ? state.patch.categoriesZh : state.patch.categories;
+  const html = cats.map((c) => {
     const entries = c.entries.filter((e) =>
-      !q || (e.name + (e.nameZh || "")).toLowerCase().includes(q));
+      !q || (e.name + (e.nameZh || "") + (e.nameEn || "")).toLowerCase().includes(q));
     if (!entries.length) return "";
     total += entries.length;
-    const cat = zh && PCAT_ZH[c.category.toLowerCase()]
+    const cat = !official && zh && PCAT_ZH[c.category.toLowerCase()]
       ? `${PCAT_ZH[c.category.toLowerCase()]} ${c.category}` : c.category;
     return `<div class="pcat">${esc(cat)}</div><div class="agrid">` +
       entries.map((e) => {
-        const title = zh && e.nameZh
-          ? `<h3>${esc(e.nameZh)}<span class="en">${richText(e.name)}</span></h3>`
-          : `<h3>${richText(e.name)}</h3>`;
-        const lns = zh ? (e.linesZh || e.lines) : (e.linesEn || e.lines);
+        let title;
+        if (official) {
+          title = `<h3>${esc(e.name)}${e.nameEn ? `<span class="en">${esc(e.nameEn)}</span>` : ""}</h3>`;
+        } else if (zh && e.nameZh) {
+          title = `<h3>${esc(e.nameZh)}<span class="en">${richText(e.name)}</span></h3>`;
+        } else {
+          title = `<h3>${richText(e.name)}</h3>`;
+        }
+        const lns = official ? e.lines : (zh ? (e.linesZh || e.lines) : (e.linesEn || e.lines));
         return `
         <div class="acard pentry">
           <div class="phead">${e.icon ? `<img src="${e.icon}" alt="" loading="lazy">` : ""}${title}</div>
@@ -560,7 +568,8 @@ function renderPatch() {
         </div>`;
       }).join("") + "</div>";
   }).join("");
-  $("patch-count").textContent = `${state.patch.patch} · ${total} 個條目`;
+  $("patch-count").textContent = `${state.patch.patch} · ${total} 個條目` +
+    (official ? " · 官方繁中原文" : "");
   $("patch-content").innerHTML = html || '<div class="status">沒有符合的條目</div>';
 }
 $("patch-ver").onchange = (e) => loadPatch(e.target.value);
