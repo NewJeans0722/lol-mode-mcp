@@ -14,7 +14,28 @@
 
 from __future__ import annotations
 
+import json
+import logging
 import re
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
+
+# 人工校訂的整句對照(Claude 逐句翻譯、隨套件出貨)。
+# key = 去除粗斜體標記後的英文原句;wiki 改句子後 miss → 退回規則/🔤。
+_OVERRIDES_PATH = Path(__file__).resolve().parent / "data" / "mapchanges_zh.json"
+_overrides: dict[str, str] | None = None
+
+
+def _load_overrides() -> dict[str, str]:
+    global _overrides
+    if _overrides is None:
+        try:
+            _overrides = json.loads(_OVERRIDES_PATH.read_text(encoding="utf-8"))
+        except OSError:
+            logger.warning("mapchanges_zh.json missing — no curated overrides")
+            _overrides = {}
+    return _overrides
 
 # ------------------------------------------------------------ 術語表
 # (英文, 台服用語)。比對不分大小寫、長詞優先;英文側是 wiki 慣用寫法。
@@ -107,6 +128,32 @@ GLOSSARY: list[tuple[str, str]] = [
     ("unempowered", "未強化"),
     ("fury", "怒氣"),
     ("tibbers", "提貝爾斯"),
+    ("per ability cast", "每次施放技能"),
+    ("ability", "技能"),
+    ("abilities", "技能"),
+    ("casts", "施放"),
+    ("cast", "施放"),
+    ("resets every round", "每回合重置"),
+    ("resets", "重置"),
+    ("reset", "重置"),
+    ("every", "每"),
+    ("marks", "印記"),
+    ("mark", "印記"),
+    ("darkin", "闇裔"),
+    ("of his", "自身"),
+    ("of her", "自身"),
+    ("of your", "自身"),
+    ("above", "高於"),
+    ("below", "低於"),
+    ("heal over time", "持續治療"),
+    ("over time", "隨時間"),
+    ("amount", "量"),
+    ("daggers", "匕首"),
+    ("dagger", "匕首"),
+    ("feathers", "羽刃"),
+    ("feather", "羽刃"),
+    ("recasts", "再施放"),
+    ("recast", "再施放"),
     ("meeps", "米普"),
     ("meep", "米普"),  # 巴德的小精靈,台服官方譯名(使用者確認)
     # 巴德的 Chimes:遊戲內文本(ddragon zh_TW)是「編鐘」,
@@ -185,6 +232,8 @@ _WHOLE_LINE = {
     "disabled": "已停用。",
     "new guest of honor.": "新登場貴賓。",
     "removed.": "已移除。",
+    "general": "整體",
+    "stats": "基礎數值",
 }
 
 # 允許殘留的英文 token(不算「沒翻到」):數值單位、鍵位、常見縮寫
@@ -222,8 +271,19 @@ def _looks_like_name(text: str) -> bool:
             and not text.endswith("."))
 
 
-def translate_line(text: str, name_map: dict[str, str] | None = None
-                   ) -> tuple[str, bool]:
+def compile_name_map(name_map: dict[str, str]) -> re.Pattern | None:
+    """名詞表(小寫 en → 台服名)→ 單一 alternation regex(長詞優先)。"""
+    keys = [k for k in name_map if len(k) >= 3]
+    if not keys:
+        return None
+    return re.compile(
+        r"\b(" + "|".join(re.escape(k)
+                          for k in sorted(keys, key=len, reverse=True)) + r")\b",
+        re.I)
+
+
+def translate_line(text: str, name_map: dict[str, str] | None = None,
+                   _name_re: re.Pattern | None = None) -> tuple[str, bool]:
     """一行改動說明 → (中文, 是否完整翻譯)。
 
     不完整時回傳的第一值仍是「原文」(呼叫端自行加 🔤 標記),
@@ -233,6 +293,20 @@ def translate_line(text: str, name_map: dict[str, str] | None = None
     original = text
     plain = text.replace("**", "").replace("*", "").strip()
 
+    if name_map and _name_re is None:
+        _name_re = compile_name_map(name_map)
+
+    def _sub_names(s: str) -> str:
+        # 句內專有名詞(技能/強化/裝備/英雄名)→ 台服名
+        if _name_re is None:
+            return s
+        return _name_re.sub(lambda m: name_map[m.group(1).lower()], s)
+
+    curated = _load_overrides().get(plain)
+    if curated:
+        # 人工譯文裡保留的英文專有名詞,執行期換成官方台服名
+        return _CJK_SPACE_RE.sub("", _sub_names(curated)), True
+
     special = _WHOLE_LINE.get(plain.lower())
     if special:
         return special, True
@@ -241,6 +315,7 @@ def translate_line(text: str, name_map: dict[str, str] | None = None
         hit = name_map.get(plain.lower())
         if hit:
             return f"{hit}({plain})", True
+        plain = _sub_names(plain)
 
     m = _ARROW_RE.match(plain)  # "Label: 15s ⇒ 10s"
     if m:
@@ -284,10 +359,11 @@ def translate_line(text: str, name_map: dict[str, str] | None = None
 def translate_lines(lines: list[str], name_map: dict[str, str] | None = None
                     ) -> list[str]:
     """整組行(含 '- ' 前綴與縮排)→ 中文;翻不完整的加 🔤 前綴。"""
+    name_re = compile_name_map(name_map) if name_map else None
     out = []
     for line in lines:
         m = re.match(r"^(\s*- )(.*)$", line)
         prefix, body = (m.group(1), m.group(2)) if m else ("", line)
-        zh, complete = translate_line(body, name_map)
+        zh, complete = translate_line(body, name_map, name_re)
         out.append(f"{prefix}{zh}" if complete else f"{prefix}🔤 {body}")
     return out

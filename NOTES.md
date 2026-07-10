@@ -181,6 +181,21 @@ src/lol_mode_mcp/
 
 ## 日誌
 
+- **2026-07-11**(arena_balance 全中文化 = 🔤 歸零):
+  - **句內名詞代換**:translate.py 的 name_map 現在也做句中代換
+    (compile_name_map 單一 alternation regex,長詞優先);
+    arena_balance.build_entity_name_map 彙整強化(cdragon)+ 裝備
+    (ddragon)+ 英雄名 + 該英雄技能(championFull),
+    「Boulder Toss cooldown changed to…」→「巨岩拋擲冷卻時間改為…」。
+  - **人工對照檔 data/mapchanges_zh.json(246 句,Claude 逐句翻譯)**:
+    規則翻不動的自由句整句對照;譯文中的專有名詞保留英文,
+    執行期由 name_map 換成官方台服名(Bone Skewer→刺骨串叉、
+    Ghostcrawlers→鬼蟹、Your Cut→你也有份 全自動)。
+    key = 去除 **/* 標記後的英文原句;**wiki 改句子會 miss → 退回
+    規則/🔤,屆時把新句子補進這個檔即可**(用 NOTES 這段的量測腳本找)。
+  - 實測:MapChanges 876 行 **0 句 🔤(100%)**。
+  - 術語表再 +30(per/every/darkin/匕首/羽刃…);
+    整行特例 general→整體、stats→基礎數值。
 - **2026-07-11**(官方繁中 patch notes 上線 = patch 改動全中文化):
   使用者要求把 🔤 全部消掉(中文版不要再有英文句)。
   - **official_notes.py(新)**:解析 Riot 官方繁中 patch notes,

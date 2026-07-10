@@ -23,8 +23,8 @@ from . import cache
 from .aram import FIELD_INFO, FIELD_LABELS_EN, get_wiki_data
 from .arena import RARITY_INFO, get_arena_data
 from .arena_balance import (AR_STAT_LABELS, AR_STAT_LABELS_EN,
-                            ability_zh_name, get_map_changes,
-                            group_champion_changes)
+                            ability_zh_name, build_entity_name_map,
+                            get_map_changes, group_champion_changes)
 from .champions import get_champions, get_spell_names
 from .translate import translate_lines
 from .wikitext import translate_annotations_en
@@ -96,6 +96,10 @@ async def api_arena_balance(_: Request) -> JSONResponse:
         spell_names = get_spell_names().data
     except cache.DataUnavailableError:
         spell_names = None
+    base_names = build_entity_name_map()  # 強化/裝備/英雄名(共用)
+    def champ_map(cid: str) -> dict[str, str]:
+        spells = (spell_names or {}).get(cid, {}).get("by_en", {})
+        return {**base_names, **spells}
     payload = {
         "revision_time": mc.data["revision_time"],
         "fetched_at": mc.fetched_at_str,
@@ -114,7 +118,7 @@ async def api_arena_balance(_: Request) -> JSONResponse:
                 "abilities": [
                     {"label": label,
                      "labelZh": ability_zh_name(c.id, label, spell_names),
-                     "lines": translate_lines(lines),  # 中文(翻不出標 🔤)
+                     "lines": translate_lines(lines, champ_map(c.id)),
                      "linesEn": [translate_annotations_en(ln) for ln in lines]}
                     for label, lines in grouped.get(c.name_en, [])
                 ],

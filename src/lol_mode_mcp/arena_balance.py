@@ -146,6 +146,37 @@ def group_champion_changes(
 
 # ------------------------------------------------------------- tool 實作
 
+def build_entity_name_map(spell_names: dict | None = None,
+                          champ_id: str | None = None) -> dict[str, str]:
+    """句內名詞代換表(小寫 en → 台服名):強化 + 裝備 + 英雄 + 該英雄技能。
+
+    給 translate.translate_lines 用,讓「Boulder Toss cooldown changed
+    to …」這種帶專有名詞的句子能過句型規則。來源都是官方字串。
+    """
+    from .arena import get_arena_data          # 延遲匯入,避免啟動時就抓資料
+    from .patch_notes import get_item_names
+    out: dict[str, str] = {}
+    try:
+        for a in get_arena_data().data.augments:
+            if a.name_en and a.name_zh:
+                out[a.name_en.lower()] = a.name_zh
+    except cache.DataUnavailableError:
+        pass
+    try:
+        for en_name, zh_name in get_item_names().data["en_to_zh"].items():
+            out[en_name.lower()] = zh_name
+    except cache.DataUnavailableError:
+        pass
+    try:
+        for c in get_champions().data:
+            out[c.name_en.lower()] = c.name_zh
+    except cache.DataUnavailableError:
+        pass
+    if spell_names and champ_id and champ_id in spell_names:
+        out.update(spell_names[champ_id]["by_en"])
+    return out
+
+
 def ability_zh_name(champ_id: str, label: str,
                     spell_names: dict | None) -> str | None:
     """技能標籤(Q/W/E/R/被動/英文技能名)→ 台服技能名;查不到回 None。"""
@@ -237,6 +268,7 @@ def do_arena_balance(champion: str, locale: str = "zh_tw") -> str:
         lines += [_format_stat(k, v, locale) for k, v in stats.items()]
         lines.append("")
 
+    name_map = None if en else build_entity_name_map(spell_names, champ.id)
     if abilities:
         lines.append("[Ability changes]" if en
                      else "【技能調整】(🔤 = 無把握規則翻譯的句子,保留英文原文)")
@@ -250,7 +282,7 @@ def do_arena_balance(champion: str, locale: str = "zh_tw") -> str:
                 if zh:
                     shown = f"{label} {zh}" if label in ("Q", "W", "E", "R", "被動") \
                         else f"{zh}({label})"
-                entry_lines = translate_lines(entry_lines)
+                entry_lines = translate_lines(entry_lines, name_map)
             lines.append(f"▸ {shown}")
             lines += ["  " + ln for ln in entry_lines]
         lines.append("")
