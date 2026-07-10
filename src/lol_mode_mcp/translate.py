@@ -109,6 +109,11 @@ GLOSSARY: list[tuple[str, str]] = [
     ("tibbers", "提貝爾斯"),
     ("meeps", "米普"),
     ("meep", "米普"),  # 巴德的小精靈,台服官方譯名(使用者確認)
+    # 巴德的 Chimes:遊戲內文本(ddragon zh_TW)是「編鐘」,
+    # 但官方繁中 patch notes 26.13 寫「調和之音」—— 兩個官方來源不一致,
+    # 依本專案標準採遊戲內字串。
+    ("chimes", "編鐘"),
+    ("chime", "編鐘"),
     ("and", "與"),
     ("true damage", "真實傷害"),
     ("magic damage", "魔法傷害"),
