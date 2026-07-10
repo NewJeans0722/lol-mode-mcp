@@ -5,14 +5,22 @@
 
 ## 目前狀態(2026-07-09)
 
-**Phase 1~3 全部完成,已上線:`https://lol-mode-mcp.onrender.com/mcp`(v0.1.0)**
+**Phase 1~3 完成 + 網頁查詢 UI 上線(2026-07-10)**
 
-下一步候選(和使用者討論中):tool 回覆附上海克斯強化圖示。
-圖源已驗證:CommunityDragon 直接掛遊戲資產,
-`https://raw.communitydragon.org/latest/game/` + JSON 裡的 `iconLarge` 路徑
-(例:`assets/ux/cherry/augments/icons/cerberus_large.png` → HTTP 200)。
-呈現方式二選一:(a) 文字附連結(便宜);(b) MCP ImageContent 內嵌
-base64 圖(Claude 會直接顯示圖卡,較慢較肥)。
+- MCP(給 Claude):`https://lol-mode-mcp.onrender.com/mcp`(v0.1.0)
+- 網頁(給人):`https://lol-mode-mcp.onrender.com/`
+  海克斯圖鑑(圖卡+搜尋+稀有度篩選)、ARAM 平衡表(可排序)。
+  同一個 server 三個出口:`/`、`/api/augments`+`/api/aram`、`/mcp`,
+  共用資料層與快取(web.py + server.py 的 custom_route)。
+
+使用者已定案的範圍決定:
+- **出裝統計不做**(使用者自己去 op.gg 查),爬蟲偵察中止。
+- 「什麼英雄能抽到什麼海克斯」:**查證過沒有結構化資料源**
+  (cdragon 兩檔案、wiki Module:ArenaAugmentData 都沒有),已向使用者說明。
+- 改動歷史:無 per-augment 結構化 changelog;現值即最新。
+- Mayhem 線索:cherry-augments.json(原始檔)有 638 筆,含 `ARAM_` 前綴
+  的 Mayhem 強化;wiki 另有 Module:ArenaAugmentData/data(255 筆,
+  英文 description/notes)可做補充註記。
 
 - ✅ 專案骨架(uv + src layout + console script `lol-mode-mcp`)
 - ✅ `get_augment` / `list_augments`(競技場強化,中英雙語搜尋)
