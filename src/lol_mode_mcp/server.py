@@ -27,6 +27,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 from .aram import do_aram_balance, do_mayhem_balance
 from .arena import do_get_augment, do_list_augments
 from .arena_balance import do_arena_balance
+from .patch_notes import do_arena_patch_notes
 
 # logging 一律走 stderr:stdio transport 下 stdout 是 MCP 協定通道,
 # 印任何雜訊到 stdout 都會弄壞協定。
@@ -111,6 +112,22 @@ def arena_balance(champion: str) -> str:
 
 
 @mcp.tool()
+def arena_patch_notes(patch: str = "latest", query: str = "") -> str:
+    """查詢某一版 patch 的競技場(Arena)改動清單(舊值 ⇒ 新值)。
+
+    涵蓋:強化(Augments)、英雄、裝備、貴賓(Guest of Honor)的
+    數值與機制改動,即「相對上一版的 nerf/buff」。
+
+    Args:
+        patch: "latest"(預設,最新版)或版本號(例:「26.13」、"V26.12")。
+        query: 選填,只看特定對象的改動,中英文皆可
+               (例:「殞落之祭」、「伊莉絲」、"Eclipse")。
+    """
+    logger.info("tool arena_patch_notes(patch=%r, query=%r)", patch, query)
+    return do_arena_patch_notes(patch, query)
+
+
+@mcp.tool()
 def mayhem_balance(champion: str) -> str:
     """查詢英雄在 ARAM: Mayhem 模式的平衡數值(延伸功能,暫未支援)。
 
@@ -151,12 +168,14 @@ def mode_mechanics() -> str:
 # ---------------------------------------------------------------- 網頁介面
 # 同一個 HTTP server 順便掛查詢網頁(給人用)與 JSON API(給網頁的 JS 用);
 # MCP 客戶端仍走 /mcp,互不干擾。stdio 模式下這些路由不存在。
-from .web import api_aram, api_arena_balance, api_augments, home  # noqa: E402
+from .web import (api_aram, api_arena_balance, api_augments,  # noqa: E402
+                  api_patch_notes, home)
 
 mcp.custom_route("/", methods=["GET"])(home)
 mcp.custom_route("/api/augments", methods=["GET"])(api_augments)
 mcp.custom_route("/api/aram", methods=["GET"])(api_aram)
 mcp.custom_route("/api/arena-balance", methods=["GET"])(api_arena_balance)
+mcp.custom_route("/api/patch-notes", methods=["GET"])(api_patch_notes)
 
 
 def main() -> None:

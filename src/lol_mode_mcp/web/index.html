@@ -145,6 +145,23 @@
   .ab li.sub { list-style-type: circle; margin-left: 14px; }
   @media (max-width: 560px) { .agrid { grid-template-columns: 1fr; } }
 
+  /* ---- Patch 改動 ---- */
+  select {
+    padding: 10px 14px; font-size: 15px; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 8px; color: var(--text);
+    font-family: inherit; outline: none;
+  }
+  select:focus { border-color: var(--gold); }
+  .pcat {
+    color: var(--gold-bright); font-size: 15px; font-weight: 600;
+    margin: 20px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--line);
+  }
+  .pcat:first-child { margin-top: 0; }
+  .pentry h3 { margin: 0 0 4px; font-size: 14.5px; }
+  .pentry ul { margin: 0; padding-left: 18px; font-size: 13px; color: #c9d2de; }
+  .pentry li { margin: 2px 0; }
+  .pentry li.sub { list-style-type: circle; margin-left: 14px; }
+
   .status { color: var(--muted); padding: 40px 0; text-align: center; }
   .stale {
     background: #3a2d12; border: 1px solid #6e5320; color: #e8c778;
@@ -168,6 +185,7 @@
   <nav>
     <button id="tab-aug" class="active">🌈 競技場海克斯圖鑑</button>
     <button id="tab-arena">⚔️ 競技場平衡</button>
+    <button id="tab-patch">📋 Patch 改動</button>
     <button id="tab-aram">🏔️ ARAM 平衡表</button>
   </nav>
 </header>
@@ -195,6 +213,18 @@
     <div id="arena-stale"></div>
     <div class="agrid" id="arena-grid"></div>
     <div class="status" id="arena-status">切到此分頁時載入…</div>
+  </section>
+
+  <!-- Patch 改動 -->
+  <section id="page-patch" hidden>
+    <div class="toolbar">
+      <select id="patch-ver"></select>
+      <input type="search" id="patch-q" placeholder="搜尋強化/英雄/裝備名(英文)…">
+      <span class="count" id="patch-count"></span>
+    </div>
+    <div id="patch-stale"></div>
+    <div id="patch-content"></div>
+    <div class="status" id="patch-status">切到此分頁時載入…</div>
   </section>
 
   <!-- ARAM -->
@@ -225,10 +255,10 @@ const TIERS = [
   ["all", "全部"], ["prismatic", "稜彩"], ["gold", "黃金"],
   ["silver", "白銀"], ["special", "特殊"],
 ];
-const state = { augs: null, aram: null, arena: null, tier: "all", augQ: "", aramQ: "", arenaQ: "", sortKey: null, sortDir: -1 };
+const state = { augs: null, aram: null, arena: null, patch: null, tier: "all", augQ: "", aramQ: "", arenaQ: "", patchQ: "", sortKey: null, sortDir: -1 };
 
 /* ---------------- 分頁切換 ---------------- */
-const TABS = ["aug", "arena", "aram"];
+const TABS = ["aug", "arena", "patch", "aram"];
 function showTab(which) {
   for (const t of TABS) {
     $("page-" + t).hidden = t !== which;
@@ -236,6 +266,7 @@ function showTab(which) {
   }
   if (which === "aram" && !state.aram) loadAram();
   if (which === "arena" && !state.arena) loadArena();
+  if (which === "patch" && !state.patch) loadPatch("latest");
 }
 for (const t of TABS) $("tab-" + t).onclick = () => showTab(t);
 
@@ -332,6 +363,48 @@ function renderArena() {
 }
 $("arena-q").oninput = (e) => { state.arenaQ = e.target.value; renderArena(); };
 $("arena-only").onchange = () => renderArena();
+
+/* ---------------- Patch 改動 ---------------- */
+async function loadPatch(ver) {
+  $("patch-status").hidden = false;
+  $("patch-status").textContent = "載入中…";
+  $("patch-content").innerHTML = "";
+  try {
+    const r = await fetch("/api/patch-notes?patch=" + encodeURIComponent(ver));
+    if (!r.ok) throw new Error((await r.json()).error || r.status);
+    state.patch = await r.json();
+    if (state.patch.stale) $("patch-stale").innerHTML = '<div class="stale">⚠️ 資料源更新失敗,顯示的是上次成功抓取的快取,可能過期。</div>';
+    $("patch-status").hidden = true;
+    $("patch-ver").innerHTML = state.patch.patches.map((p) =>
+      `<option value="${p}" ${p === state.patch.patch ? "selected" : ""}>${p}</option>`).join("");
+    renderPatch();
+  } catch (e) {
+    $("patch-status").hidden = false;
+    $("patch-status").textContent = "載入失敗:" + e.message;
+  }
+}
+function renderPatch() {
+  const q = state.patchQ.trim().toLowerCase();
+  let total = 0;
+  const html = state.patch.categories.map((c) => {
+    const entries = c.entries.filter((e) => !q || e.name.toLowerCase().includes(q));
+    if (!entries.length) return "";
+    total += entries.length;
+    return `<div class="pcat">${esc(c.category)}</div><div class="agrid">` +
+      entries.map((e) => `
+        <div class="acard pentry">
+          <h3>${richText(e.name)}</h3>
+          ${e.lines.length ? "<ul>" + e.lines.map((ln) => {
+            const depth = (ln.match(/^ */)[0].length) / 2;
+            return `<li class="${depth > 0 ? "sub" : ""}">${richText(ln.replace(/^ *- /, ""))}</li>`;
+          }).join("") + "</ul>" : ""}
+        </div>`).join("") + "</div>";
+  }).join("");
+  $("patch-count").textContent = `${state.patch.patch} · ${total} 個條目`;
+  $("patch-content").innerHTML = html || '<div class="status">沒有符合的條目</div>';
+}
+$("patch-ver").onchange = (e) => loadPatch(e.target.value);
+$("patch-q").oninput = (e) => { state.patchQ = e.target.value; renderPatch(); };
 
 /* ---------------- ARAM 平衡表 ---------------- */
 async function loadAram() {

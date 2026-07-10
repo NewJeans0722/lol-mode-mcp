@@ -24,6 +24,7 @@ from .arena import RARITY_INFO, get_arena_data
 from .arena_balance import (AR_STAT_LABELS, get_map_changes,
                             group_champion_changes)
 from .champions import get_champions
+from .patch_notes import get_arena_notes, get_patch_titles, normalize_patch
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +99,36 @@ async def api_arena_balance(_: Request) -> JSONResponse:
         ],
     }
     return JSONResponse(payload)
+
+
+async def api_patch_notes(request: Request) -> JSONResponse:
+    patch = request.query_params.get("patch", "latest").strip()
+    try:
+        titles = get_patch_titles().data
+        if patch.lower() in ("", "latest"):
+            candidates = titles[:4]  # 最新頁可能還沒有 Arena 段落,往前找
+        else:
+            wanted = normalize_patch(patch)
+            if wanted is None or wanted not in titles:
+                return JSONResponse({"error": f"找不到 patch「{patch}」"},
+                                    status_code=400)
+            candidates = [wanted]
+        notes, stale, fetched = None, False, ""
+        for title in candidates:
+            result = get_arena_notes(title)
+            if result.data["categories"] or title == candidates[-1]:
+                notes, stale, fetched = result.data, result.is_stale, result.fetched_at_str
+                if result.data["categories"]:
+                    break
+    except cache.DataUnavailableError as exc:
+        return JSONResponse({"error": f"資料源連線失敗:{exc}"}, status_code=503)
+    return JSONResponse({
+        "patch": notes["patch"],
+        "patches": titles[:16],  # 給下拉選單
+        "fetched_at": fetched,
+        "stale": stale,
+        "categories": notes["categories"],
+    })
 
 
 async def api_aram(_: Request) -> JSONResponse:

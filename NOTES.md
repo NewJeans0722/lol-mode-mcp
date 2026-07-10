@@ -48,11 +48,13 @@
      遊戲內規則(如一轉就贏只給有旋轉技能的英雄)未公開。
    - 能做的:強化說明本身已自述條件(「你的旋轉類技能…」);
      在 UI 上標注「此類強化依英雄技能組決定是否出現」。
-4. **相對上一版的改動 — 資料源:wiki 各 patch 頁(V26.x)+ Arena 頁
-   Patch History 章節**;逐 patch 的 Arena 段落可解析成 changelog。
-   使用者提到的裝備「伊卡西亞殞落」在 items.json 找不到
-   (最接近:3430「殞落之祭」= Rite of Ruin,競技場道具),
-   **待向使用者確認正確名稱**。
+4. ✅ **相對上一版的改動 — 完成(2026-07-10,見日誌)**
+   - 成品:tool `arena_patch_notes(patch, query)` + 網頁「📋 Patch 改動」
+     分頁(`/api/patch-notes`),資料源是各 patch 頁的 Arena 段落。
+   - 裝備名已確認:使用者說的是 **3430「殞落之祭」= Rite Of Ruin**
+     (「伊卡西亞殞落」是口誤);查詢翻譯靠 ddragon item.json 中英對照。
+   - Arena/Patch history 子頁(5th launch 等)是「模式改版史」,
+     只有大改版(V26.09)有內容,逐版 nerf/buff 還是在 patch 頁。
 5. 雜項:`{{ 字串表引用 }}` bug 已修(formatting.py `_STRING_TABLE`,
    新引用的查法:cdragon `game/zh_cn/data/menu/en_us/lol.stringtable.json`
    的 entries,key 小寫;zh_tw 不存在,需手工繁化)。
@@ -61,6 +63,7 @@
 - ✅ `get_augment` / `list_augments`(競技場強化,中英雙語搜尋)
 - ✅ `aram_balance`(LoL Wiki Lua 模組解析,含英雄名中英正規化)
 - ✅ `arena_balance`(競技場基礎數值 + 逐技能調整;2026-07-10)
+- ✅ `arena_patch_notes`(逐 patch 競技場改動,query 支援中文;2026-07-10)
 - ✅ `mayhem_balance` stub(回「暫未支援」)
 - ✅ resource `lol-mode://mode-mechanics`(骨架 JSON,內容待作者校訂,搜 TODO)
 - ✅ 28 個單元測試全過;stdio 與 streamable-http 都用真 MCP client 驗證過
@@ -87,7 +90,8 @@ src/lol_mode_mcp/
   aram.py        ARAM 數值:wiki Lua 模組解析/排版;mayhem stub
                  (同一次抓取也解析競技場 "ar" 基礎數值區塊)
   arena_balance.py 競技場每英雄調整:MapChanges/ar 解析、依英雄分組、tool
-  wikitext.py    wiki {{模板}}/[[連結]] → 純文字(只覆蓋 MapChanges 用到的)
+  patch_notes.py 逐 patch 競技場改動:patch 頁枚舉/Arena 段落解析/中文查詢翻譯
+  wikitext.py    wiki {{模板}}/[[連結]] → 純文字(MapChanges + patch 頁共用)
   champions.py   英雄名正規化(Data Dragon en_US + zh_TW)
   formatting.py  @佔位符@ 代入 dataValues、HTML 標籤清理
   cache.py       記憶體 TTL 快取(12h),重抓失敗退回 stale 並標注
@@ -176,6 +180,24 @@ src/lol_mode_mcp/
 
 ## 日誌
 
+- **2026-07-10**(競技場擴充第 4 項):新 tool `arena_patch_notes` +
+  網頁「📋 Patch 改動」分頁(`/api/patch-notes?patch=`)。實作重點:
+  - 資料源:各 patch 頁(V26.13 等)的 `== Arena ==` 段落,三層 bullet
+    (分類→條目→「舊 ⇒ 新」),幾乎無模板,清理器直接沿用。
+    ⚠️ wiki 有 `== Arena ===` 這種等號不對稱的標題,extract 已容錯。
+  - 「最新 patch」不從 cdragon 版本推算(ddragon 16.x ≠ wiki V26.x
+    兩套編號),改用 MediaWiki allpages(apprefix=V2)枚舉取最大;
+    最新頁若沒有 Arena 段落自動往前找(最多 4 版)。
+  - query 中文翻譯:英雄走 resolve_champion、強化走 arena 雙語索引、
+    裝備新增 ddragon item.json 中英對照(cache key `item_names`)。
+    「殞落之祭」→ Rite Of Ruin 驗證過;最新版沒改到時自動往回找
+    最近一次改動(最多 8 版)。
+  - **刻意不做**:不自動判定 buff/nerf(「冷卻 60⇒15」是好是壞看機制,
+    亂標會錯),原樣呈現「舊 ⇒ 新」。
+  - Arena/Patch history 子頁是 tabview(1st~5th launch),屬模式改版史;
+    patch 頁另有 `ARAM: Mayhem` 段落 —— 未來 mayhem 可用同一套解析器。
+  - 驗收:73 tests 全過(+6);MCP client 實測 6 tools、API latest/26.12
+    正常、網頁 JS node 實跑(37 條目、過濾正常、無殘留模板)。
 - **2026-07-10**(競技場擴充第 1 項):新 tool `arena_balance` + 網頁
   「⚔️ 競技場平衡」分頁(`/api/arena-balance`)上線。實作重點:
   - `wikitext.py`:模板清理器。語意都查過模板原始碼 ——
