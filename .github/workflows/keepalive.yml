@@ -1,0 +1,15 @@
+# Render 免費方案閒置 15 分鐘會休眠,冷啟動要 30~60 秒 —— 訪客的「卡」
+# 主要來自這裡。用 GitHub Actions 排程每 ~12 分鐘 ping 一次首頁保持喚醒。
+# 注意:repo 60 天沒有 commit 的話 GitHub 會自動停用排程(會寄信通知)。
+name: keepalive
+on:
+  schedule:
+    - cron: "*/12 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: ping site
+        run: curl -fsS -m 90 -o /dev/null https://lol-mode-mcp.onrender.com/ || true

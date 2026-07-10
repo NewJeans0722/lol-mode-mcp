@@ -181,6 +181,20 @@ src/lol_mode_mcp/
 
 ## 日誌
 
+- **2026-07-11**(網站效能:使用者反映「其他人用卡卡的」):
+  診斷:①/api/arena-balance 每個請求重算全部翻譯,實測 **6.2 秒/次**;
+  ②無 gzip(161KB 裸傳)③無 Cache-Control ④Render 免費版冷啟動 30~60s。
+  修法(web.py `_cached_json` + `warmup`):
+  - **回應層快取**:組好的 payload 進 TTL 快取(1h),之後請求只剩
+    序列化+gzip。實測 arena-balance 6.2s → **30ms**。
+  - **gzip**(>10KB 且客戶端支援):161KB → 33KB。
+  - **Cache-Control: public, max-age=300**:瀏覽器再擋 5 分鐘。
+  - **開機暖身執行緒**(server.py main):抓齊資料+預算 6 個 payload,
+    實測 10 秒內完成。
+  - **防休眠**:`.github/workflows/keepalive.yml` 每 12 分鐘 ping 首頁
+    (⚠️ repo 60 天沒 commit 會被 GitHub 自動停用排程,會寄信)。
+  - ⚠️ 測試坑:Windows 上用 `localhost` 打 API 會有固定 ~2s 延遲
+    (IPv6 fallback),量測要用 `127.0.0.1`。
 - **2026-07-11**(arena_balance 全中文化 = 🔤 歸零):
   - **句內名詞代換**:translate.py 的 name_map 現在也做句中代換
     (compile_name_map 單一 alternation regex,長詞優先);

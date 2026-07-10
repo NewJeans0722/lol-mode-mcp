@@ -187,6 +187,11 @@ mcp.custom_route("/api/patch-notes", methods=["GET"])(api_patch_notes)
 def main() -> None:
     transport = os.environ.get("MCP_TRANSPORT", "stdio").strip().lower()
     if transport in ("http", "streamable-http", "streamable_http"):
+        # 開機暖身:背景先抓齊資料源、算好 API payload(arena-balance
+        # 全量翻譯實測要數秒),讓第一個訪客不用等
+        import threading
+        from .web import warmup
+        threading.Thread(target=warmup, daemon=True, name="warmup").start()
         # 注意:這版官方 SDK 的 FastMCP() 建構子會把預設 host/port 明確
         # 塞進 Settings,導致 FASTMCP_* 環境變數被蓋掉 —— 所以自己讀。
         # PORT 是各家雲端平台的慣例;HTTP 模式要綁 0.0.0.0 外面才連得到。

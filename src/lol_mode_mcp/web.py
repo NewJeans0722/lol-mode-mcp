@@ -12,12 +12,14 @@ arena.py / aram.py 專心維護資料本身,這裡才決定網頁要看到什麼
 
 from __future__ import annotations
 
+import gzip
+import json
 import logging
 import os
 from pathlib import Path
 
 from starlette.requests import Request
-from starlette.responses import HTMLResponse, JSONResponse
+from starlette.responses import HTMLResponse, JSONResponse, Response
 
 from . import cache
 from .aram import FIELD_INFO, FIELD_LABELS_EN, get_wiki_data
@@ -40,6 +42,25 @@ _INDEX_PATH = Path(__file__).resolve().parent / "web" / "index.html"
 _TIER_SLUG = {0: "silver", 1: "gold", 2: "prismatic", 4: "special"}
 
 
+# ------------------------------------------------------- 效能:回應層快取
+# payload 的「組裝」本身很貴(arena-balance 要對 173 隻英雄跑翻譯與
+# 名詞代換,實測 ~6 秒),所以組好的 payload 也進 TTL 快取,
+# 之後的請求只剩序列化 + gzip(毫秒級)。
+
+def _cached_json(request: Request, key: str, builder,
+                 ttl: float = 3600) -> Response:
+    try:
+        result = cache.get_cached(key, builder, ttl=ttl)
+    except cache.DataUnavailableError as exc:
+        return JSONResponse({"error": f"資料源連線失敗:{exc}"}, status_code=503)
+    body = json.dumps(result.data, ensure_ascii=False).encode()
+    headers = {"Cache-Control": "public, max-age=300"}  # 瀏覽器再快取 5 分鐘
+    if len(body) > 10_000 and "gzip" in request.headers.get("accept-encoding", ""):
+        body = gzip.compress(body, 6)
+        headers["Content-Encoding"] = "gzip"
+    return Response(body, media_type="application/json", headers=headers)
+
+
 async def home(_: Request) -> HTMLResponse:
     try:
         html = _INDEX_PATH.read_text(encoding="utf-8")
@@ -55,13 +76,10 @@ async def home(_: Request) -> HTMLResponse:
     return HTMLResponse(html)
 
 
-async def api_augments(_: Request) -> JSONResponse:
-    try:
-        result = get_arena_data()
-    except cache.DataUnavailableError as exc:
-        return JSONResponse({"error": f"資料源連線失敗:{exc}"}, status_code=503)
+def _augments_payload() -> dict:
+    result = get_arena_data()
     data = result.data
-    payload = {
+    return {
         "patch": data.patch,
         "fetched_at": result.fetched_at_str,
         "stale": result.is_stale,
@@ -80,16 +98,16 @@ async def api_augments(_: Request) -> JSONResponse:
             for a in data.augments
         ],
     }
-    return JSONResponse(payload)
 
 
-async def api_arena_balance(_: Request) -> JSONResponse:
-    try:
-        champs = get_champions()
-        wiki = get_wiki_data()      # 基礎數值(ar 區塊,與 ARAM 同一次抓取)
-        mc = get_map_changes()      # 逐技能調整
-    except cache.DataUnavailableError as exc:
-        return JSONResponse({"error": f"資料源連線失敗:{exc}"}, status_code=503)
+async def api_augments(request: Request) -> Response:
+    return _cached_json(request, "api_augments", _augments_payload)
+
+
+def _arena_balance_payload() -> dict:
+    champs = get_champions()
+    wiki = get_wiki_data()      # 基礎數值(ar 區塊,與 ARAM 同一次抓取)
+    mc = get_map_changes()      # 逐技能調整
     ar = wiki.data.get("ar", {})
     grouped = group_champion_changes(mc.data["champions"], champs.data)
     try:  # 技能台服名:抓不到只影響中文顯示,不擋主資料
@@ -126,33 +144,27 @@ async def api_arena_balance(_: Request) -> JSONResponse:
             for c in sorted(champs.data, key=lambda c: c.name_en)
         ],
     }
-    return JSONResponse(payload)
+    return payload
 
 
-async def api_patch_notes(request: Request) -> JSONResponse:
-    patch = request.query_params.get("patch", "latest").strip()
-    scope = request.query_params.get("scope", "arena").strip().lower()
-    if scope not in SCOPES:
-        return JSONResponse({"error": f"scope「{scope}」不存在"}, status_code=400)
-    try:
-        titles = get_patch_titles().data
-        if patch.lower() in ("", "latest"):
-            candidates = titles[:4]  # 最新頁可能還沒有該段落,往前找
-        else:
-            wanted = normalize_patch(patch)
-            if wanted is None or wanted not in titles:
-                return JSONResponse({"error": f"找不到 patch「{patch}」"},
-                                    status_code=400)
-            candidates = [wanted]
-        notes, stale, fetched = None, False, ""
-        for title in candidates:
-            result = get_patch_data(title)
-            if result.data["scopes"].get(scope) or title == candidates[-1]:
-                notes, stale, fetched = result.data, result.is_stale, result.fetched_at_str
-                if result.data["scopes"].get(scope):
-                    break
-    except cache.DataUnavailableError as exc:
-        return JSONResponse({"error": f"資料源連線失敗:{exc}"}, status_code=503)
+async def api_arena_balance(request: Request) -> Response:
+    return _cached_json(request, "api_arena_balance", _arena_balance_payload)
+
+
+def _patch_notes_payload(patch: str, scope: str) -> dict:
+    """patch 已由 handler 驗證過('latest' 或存在的 VYY.MM)。"""
+    titles = get_patch_titles().data
+    if patch == "latest":
+        candidates = titles[:4]  # 最新頁可能還沒有該段落,往前找
+    else:
+        candidates = [patch]
+    notes, stale, fetched = None, False, ""
+    for title in candidates:
+        result = get_patch_data(title)
+        if result.data["scopes"].get(scope) or title == candidates[-1]:
+            notes, stale, fetched = result.data, result.is_stale, result.fetched_at_str
+            if result.data["scopes"].get(scope):
+                break
 
     # 中文版:Riot 官方繁中 patch notes 原文(抓不到就 null,前端退回規則翻譯)
     categories_zh = None
@@ -175,7 +187,7 @@ async def api_patch_notes(request: Request) -> JSONResponse:
     except Exception as exc:  # noqa: BLE001 — 官方頁失敗不影響主資料
         logger.warning("official zh notes unavailable: %s", exc)
 
-    return JSONResponse({
+    return {
         "patch": notes["patch"],
         "patches": titles[:16],  # 給下拉選單
         "scope": scope,
@@ -183,17 +195,36 @@ async def api_patch_notes(request: Request) -> JSONResponse:
         "stale": stale,
         "categories": enrich_categories(notes["scopes"].get(scope, [])),
         "categoriesZh": categories_zh,
-    })
+    }
 
 
-async def api_aram(_: Request) -> JSONResponse:
-    try:
-        champs = get_champions()
-        wiki = get_wiki_data()
-    except cache.DataUnavailableError as exc:
-        return JSONResponse({"error": f"資料源連線失敗:{exc}"}, status_code=503)
+async def api_patch_notes(request: Request) -> Response:
+    patch = request.query_params.get("patch", "latest").strip()
+    scope = request.query_params.get("scope", "arena").strip().lower()
+    if scope not in SCOPES:
+        return JSONResponse({"error": f"scope「{scope}」不存在"}, status_code=400)
+    if patch.lower() in ("", "latest"):
+        patch = "latest"
+    else:
+        wanted = normalize_patch(patch)
+        try:
+            titles = get_patch_titles().data
+        except cache.DataUnavailableError as exc:
+            return JSONResponse({"error": f"資料源連線失敗:{exc}"},
+                                status_code=503)
+        if wanted is None or wanted not in titles:
+            return JSONResponse({"error": f"找不到 patch「{patch}」"},
+                                status_code=400)
+        patch = wanted
+    return _cached_json(request, f"api_patch_{patch}_{scope}",
+                        lambda: _patch_notes_payload(patch, scope))
+
+
+def _aram_payload() -> dict:
+    champs = get_champions()
+    wiki = get_wiki_data()
     aram = wiki.data["aram"]
-    payload = {
+    return {
         "revision_time": wiki.data["revision_time"],
         "fetched_at": wiki.fetched_at_str,
         "stale": wiki.is_stale or champs.is_stale,
@@ -212,4 +243,26 @@ async def api_aram(_: Request) -> JSONResponse:
             for c in sorted(champs.data, key=lambda c: c.name_en)
         ],
     }
-    return JSONResponse(payload)
+
+
+async def api_aram(request: Request) -> Response:
+    return _cached_json(request, "api_aram", _aram_payload)
+
+
+def warmup() -> None:
+    """啟動時在背景把資料源與 API payload 都先算好,訪客不用等。"""
+    builders = [("api_augments", _augments_payload),
+                ("api_aram", _aram_payload),
+                ("api_arena_balance", _arena_balance_payload),
+                ("api_patch_latest_arena",
+                 lambda: _patch_notes_payload("latest", "arena")),
+                ("api_patch_latest_general",
+                 lambda: _patch_notes_payload("latest", "general")),
+                ("api_patch_latest_mayhem",
+                 lambda: _patch_notes_payload("latest", "mayhem"))]
+    for key, builder in builders:
+        try:
+            cache.get_cached(key, builder)
+            logger.info("warmup ok: %s", key)
+        except Exception as exc:  # noqa: BLE001 — 暖身失敗不影響服務
+            logger.warning("warmup failed for %s: %s", key, exc)
