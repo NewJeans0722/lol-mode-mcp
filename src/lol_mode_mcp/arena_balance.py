@@ -255,10 +255,10 @@ def do_arena_balance(champion: str, locale: str = "zh_tw") -> str:
             logger.warning("spell name map unavailable: %s", exc)
 
     if en:
-        title = f"⚔️ {champ.name_en}({champ.name_zh})"
+        title = f"{champ.name_en}({champ.name_zh})"
         lines = [title, "Arena balance changes this patch:", ""]
     else:
-        title = f"⚔️ {champ.name_zh}({champ.name_en})"
+        title = f"{champ.name_zh}({champ.name_en})"
         if champ.title_zh:
             title += f" — {champ.title_zh}"
         lines = [title, "競技場(Arena)本 patch 平衡調整:", ""]
@@ -296,13 +296,13 @@ def do_arena_balance(champion: str, locale: str = "zh_tw") -> str:
         lines = [title, no_change, ""]
 
     if en:
-        src = f"📌 Source: LoL Wiki (CC BY-SA) · MapChanges revised {revision}"
+        src = f"Source: LoL Wiki (CC BY-SA) · MapChanges revised {revision}"
         if problems:
             src += "\n⚠️ Partial source failure: " + "; ".join(problems)
         if stale:
             src += "\n⚠️ Refresh failed; showing last cached data (may be outdated)."
     else:
-        src = f"📌 資料:LoL Wiki(CC BY-SA)· MapChanges 模組更新於 {revision}"
+        src = f"資料來源:LoL Wiki(CC BY-SA)· MapChanges 模組更新於 {revision}"
         if problems:
             src += "\n⚠️ 部分資料源失敗:" + "; ".join(problems)
         if stale:

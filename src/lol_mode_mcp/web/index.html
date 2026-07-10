@@ -3,7 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>LoL 模式資料庫 — 競技場海克斯 & ARAM 平衡</title>
+<title>LoL 模式資料庫 · zhongiii</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpolygon points='16,2 29,9.5 29,24.5 16,32 3,24.5 3,9.5' fill='%230a0e14' stroke='%23c8aa6e' stroke-width='2'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-family='Georgia,serif' font-weight='bold' font-size='15' fill='%23f0d493'%3EZ%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg: #0a0e14;
@@ -23,6 +27,8 @@
     --prism-a: #7de3ff; --prism-b: #c297ff; --prism-c: #ffc2e0;
     --special: #5ec8b0;
     --stale-bg: #3a2d12; --stale-line: #6e5320; --stale-text: #e8c778;
+    --accent: #7fc8e8;           /* zhongiii 個人強調色(粉藍) */
+    --hexline: rgba(200,170,110,.05);  /* 背景六角紋 */
   }
   body.light {
     --bg: #f3f1ea;
@@ -42,6 +48,8 @@
     --prism-a: #2996b8; --prism-b: #8a55d8; --prism-c: #c2578e;
     --special: #1f8a72;
     --stale-bg: #fdf3d8; --stale-line: #d9bc72; --stale-text: #7a5c10;
+    --accent: #1f7fae;
+    --hexline: rgba(138,108,44,.08);
   }
   * { box-sizing: border-box; }
   body {
@@ -49,11 +57,24 @@
     font-family: "Segoe UI", "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif;
     line-height: 1.55;
   }
+  /* 背景六角浮雕紋(hextech) */
+  body::before {
+    content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='97' viewBox='0 0 56 97'%3E%3Cg fill='none' stroke='%23c8aa6e' stroke-width='1'%3E%3Cpolygon points='28,1 54,16 54,48 28,63 2,48 2,16'/%3E%3Cpolygon points='28,65 54,80 54,112 28,127 2,112 2,80'/%3E%3C/g%3E%3C/svg%3E") repeat;
+    opacity: .04;
+  }
+  body.light::before { opacity: .07; }
   header {
     padding: 28px 20px 0; max-width: 1180px; margin: 0 auto;
   }
-  h1 { margin: 0 0 4px; font-size: 26px; letter-spacing: .5px; }
+  .serif, h1, nav button { font-family: "Cinzel", "Segoe UI", "Microsoft JhengHei", "Noto Sans TC", serif; }
+  h1 { margin: 0 0 2px; font-size: 26px; letter-spacing: 1px; }
   h1 .gold { color: var(--gold-bright); }
+  .byline {
+    color: var(--accent); font-size: 11px; letter-spacing: 4px;
+    text-transform: uppercase; margin-left: 10px; vertical-align: 4px;
+    font-family: "Cinzel", serif;
+  }
   .sub { color: var(--muted); font-size: 14px; margin: 0 0 18px; }
   .sub .patch { color: var(--gold); font-weight: 600; }
 
@@ -61,20 +82,24 @@
   .langs { margin-left: auto; display: flex; gap: 4px; padding-bottom: 6px; }
   .langs button {
     padding: 4px 12px; font-size: 13px; border: 1px solid var(--line);
-    border-radius: 999px; background: var(--panel); color: var(--muted);
-    cursor: pointer; font-family: inherit;
+    background: var(--panel); color: var(--muted); cursor: pointer;
+    font-family: inherit; letter-spacing: 1px;
+    clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
   }
-  .langs button.active { color: var(--gold-bright); border-color: var(--gold); }
+  .langs button.active { color: var(--accent); border-color: var(--accent); }
   /* 字體大小(zoom 縮放整頁,現代瀏覽器皆支援) */
   body.fs-lg { zoom: 1.15; }
   body.fs-xl { zoom: 1.3; }
   body.fs-sm { zoom: 0.9; }
   nav button {
-    background: none; border: none; color: var(--muted); font-size: 15px;
-    padding: 10px 18px; cursor: pointer; border-bottom: 2px solid transparent;
-    font-family: inherit;
+    background: none; border: none; color: var(--muted); font-size: 14.5px;
+    padding: 10px 16px; cursor: pointer; border-bottom: 2px solid transparent;
+    letter-spacing: 1.5px;
   }
-  nav button.active { color: var(--gold-bright); border-bottom-color: var(--gold); }
+  nav button.active {
+    color: var(--gold-bright); border-bottom-color: var(--gold);
+    text-shadow: 0 0 14px rgba(240,212,147,.45);
+  }
   nav button:hover { color: var(--text); }
 
   main { max-width: 1180px; margin: 0 auto; padding: 18px 20px 40px; }
@@ -88,9 +113,10 @@
   input[type="search"]:focus { border-color: var(--gold); }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
   .chip {
-    padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line);
+    padding: 6px 14px; border: 1px solid var(--line); letter-spacing: .5px;
     background: var(--panel); color: var(--muted); font-size: 13px; cursor: pointer;
     font-family: inherit;
+    clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
   }
   .chip.active { border-color: var(--gold); color: var(--gold-bright); background: var(--panel-2); }
   .count { color: var(--muted); font-size: 13px; margin-left: auto; }
@@ -101,7 +127,7 @@
     grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
   }
   .card {
-    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 3px;
     padding: 14px; display: flex; gap: 12px; position: relative; overflow: hidden;
   }
   .card::before {
@@ -134,7 +160,7 @@
   .badge.special { color: var(--special); border-color: var(--special); }
 
   /* ---- ARAM 表 ---- */
-  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 2px; }
   table { border-collapse: collapse; width: 100%; min-width: 860px; font-size: 14px; }
   th, td { padding: 8px 12px; text-align: center; white-space: nowrap; }
   th {
@@ -142,7 +168,7 @@
     position: sticky; top: 0; user-select: none;
   }
   th:hover { color: var(--gold-bright); }
-  th .arrow { font-size: 10px; }
+  th .arrow { font-size: 10px; color: var(--accent); }
   tbody tr { border-top: 1px solid var(--line); background: var(--panel); }
   tbody tr:hover { background: var(--panel-2); }
   td.champ { text-align: left; }
@@ -155,7 +181,13 @@
 
   /* ---- 競技場平衡卡片 ---- */
   .agrid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(470px, 1fr)); }
-  .acard { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .acard { background: var(--panel); border: 1px solid var(--line); border-radius: 2px; padding: 14px 16px; position: relative; }
+  /* hextech 金色角框(招牌元素) */
+  .acard::before, .acard::after {
+    content: ""; position: absolute; width: 12px; height: 12px; pointer-events: none;
+  }
+  .acard::before { top: -1px; left: -1px; border-top: 2px solid var(--gold); border-left: 2px solid var(--gold); }
+  .acard::after { bottom: -1px; right: -1px; border-bottom: 2px solid var(--gold); border-right: 2px solid var(--gold); }
   .ahead { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
   .ahead img { width: 44px; height: 44px; border-radius: 8px; background: var(--panel-2); }
   .ahead h3 { margin: 0; font-size: 16px; }
@@ -209,9 +241,10 @@
   .roles { display: flex; flex-wrap: wrap; gap: 6px; }
   .role-chip {
     display: inline-flex; align-items: center; gap: 5px;
-    padding: 5px 12px 5px 8px; border-radius: 999px; border: 1px solid var(--line);
+    padding: 5px 12px 5px 8px; border: 1px solid var(--line);
     background: var(--panel); color: var(--muted); font-size: 13px; cursor: pointer;
     font-family: inherit;
+    clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
   }
   .role-chip img { width: 17px; height: 17px; filter: grayscale(60%) opacity(.75); }
   .role-chip.active { border-color: var(--gold); color: var(--gold-bright); background: var(--panel-2); }
@@ -221,6 +254,8 @@
     color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--line);
   }
   footer a { color: var(--gold); text-decoration: none; }
+  footer a:hover, .card a:hover { color: var(--accent); }
+  .accent { color: var(--accent); }
   @media (max-width: 640px) {
     .grid { grid-template-columns: 1fr; }
     h1 { font-size: 21px; }
@@ -229,17 +264,17 @@
 </head>
 <body>
 <header>
-  <h1>LoL <span class="gold">模式資料庫</span></h1>
+  <h1>LoL <span class="gold">模式資料庫</span><span class="byline">by zhongiii</span></h1>
   <p class="sub" id="meta">載入中…</p>
   <nav>
-    <button id="tab-aug" class="active">🌈 競技場海克斯圖鑑</button>
-    <button id="tab-arena">⚔️ 競技場平衡</button>
-    <button id="tab-patch">📋 Patch 改動</button>
-    <button id="tab-aram">🏔️ ARAM 平衡表</button>
+    <button id="tab-aug" class="active">競技場海克斯圖鑑</button>
+    <button id="tab-arena">競技場平衡</button>
+    <button id="tab-patch">Patch 改動</button>
+    <button id="tab-aram">ARAM 平衡表</button>
     <div class="langs">
       <button id="lang-zh" class="active">中</button>
       <button id="lang-en">EN</button>
-      <button id="theme-btn" title="深色/淺色">🌙</button>
+      <button id="theme-btn" title="深色/淺色">◐</button>
       <button id="font-btn" title="字體大小">A</button>
     </div>
   </nav>
@@ -303,9 +338,9 @@
   <a href="https://wiki.leagueoflegends.com/">League of Legends Wiki</a>(平衡數值與 patch 改動,CC BY-SA 4.0)、
   Riot <a href="https://developer.riotgames.com/docs/lol#data-dragon">Data Dragon</a>(英雄/裝備/技能台服譯名)。
   同一網址亦提供 MCP 服務(<code>/mcp</code>),可加入 Claude 的 Connectors。</p>
-  <p>📮 聯繫作者:<a href="https://github.com/NewJeans0722">GitHub @NewJeans0722</a> ·
+  <p>聯繫作者:<a href="https://github.com/NewJeans0722">zhongiii(GitHub @NewJeans0722)</a> ·
   問題回報:<a href="https://github.com/NewJeans0722/lol-mode-mcp/issues">lol-mode-mcp Issues</a> ·
-  🤖 本專案與 <a href="https://claude.com/claude-code">Claude</a>(Anthropic)協同開發。</p>
+  本專案與 <a href="https://claude.com/claude-code">Claude</a>(Anthropic)協同開發。</p>
   <p>本站未經 Riot Games 認可,不代表 Riot Games 或任何官方參與者之觀點或立場。
   League of Legends 及其相關資產為 Riot Games, Inc. 之商標或註冊商標。</p>
 </footer>
@@ -349,7 +384,7 @@ $("lang-en").onclick = () => setLang("en");
 /* ---------------- 深色/淺色 ---------------- */
 function setTheme(t) {
   document.body.classList.toggle("light", t === "light");
-  $("theme-btn").textContent = t === "light" ? "☀️" : "🌙";
+  $("theme-btn").textContent = t === "light" ? "◑" : "◐";
   try { localStorage.setItem("theme", t); } catch (e) {}
 }
 $("theme-btn").onclick = () =>
@@ -496,9 +531,9 @@ $("arena-only").onchange = () => renderArena();
 /* ---------------- Patch 改動 ---------------- */
 state.patchScope = "arena";
 const SCOPE_TABS = [
-  ["arena", "⚔️ 競技場", "⚔️ Arena"],
-  ["general", "🗺️ 一般對戰", "🗺️ General"],
-  ["mayhem", "🌪️ ARAM Mayhem", "🌪️ Mayhem"],
+  ["arena", "競技場", "Arena"],
+  ["general", "一般對戰", "General"],
+  ["mayhem", "ARAM Mayhem", "Mayhem"],
 ];
 function renderScopeChips() {
   const zh = state.lang === "zh";
@@ -568,8 +603,8 @@ function renderPatch() {
         </div>`;
       }).join("") + "</div>";
   }).join("");
-  $("patch-count").textContent = `${state.patch.patch} · ${total} 個條目` +
-    (official ? " · 官方繁中原文" : "");
+  $("patch-count").innerHTML = esc(`${state.patch.patch} · ${total} 個條目`) +
+    (official ? ' · <span class="accent">官方繁中原文</span>' : "");
   $("patch-content").innerHTML = html || '<div class="status">沒有符合的條目</div>';
 }
 $("patch-ver").onchange = (e) => loadPatch(e.target.value);

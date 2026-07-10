@@ -434,9 +434,9 @@ def do_patch_notes(scope: str = "arena", patch: str = "latest",
             break
     if notes is None:
         if len(candidates) == 1:
-            return (f"📋 {candidates[0]} 的 patch 頁裡**沒有{scope_zh}段落**"
+            return (f"{candidates[0]} 的 patch 頁裡**沒有{scope_zh}段落**"
                     f"(該版可能沒有此範圍的改動)。")
-        return (f"📋 最近幾版({'、'.join(candidates)})的 patch 頁都沒有"
+        return (f"最近幾版({'、'.join(candidates)})的 patch 頁都沒有"
                 f"{scope_zh}段落。")
 
     categories = notes["scopes"][scope]
@@ -469,7 +469,7 @@ def do_patch_notes(scope: str = "arena", patch: str = "latest",
         if not filtered:
             cats = "、".join(_category_label(c["category"]) for c in categories)
             terms_hint = "、".join(sorted(terms - {query.strip()}))
-            msg = (f"📋 {notes['patch']} 的{scope_zh}改動裡**沒有提到**「{query}」")
+            msg = (f"{notes['patch']} 的{scope_zh}改動裡**沒有提到**「{query}」")
             if terms_hint:
                 msg += f"(也試過英文名:{terms_hint})"
             if len(candidates) > 1:
@@ -480,9 +480,9 @@ def do_patch_notes(scope: str = "arena", patch: str = "latest",
 
     official = None
     if en:
-        lines = [f"📋 {scope_name} patch changes — {notes['patch']}"]
+        lines = [f"{scope_name} patch changes — {notes['patch']}"]
         if fallback_note:
-            lines.insert(0, f"ℹ️ {fallback_note}")
+            lines.insert(0, f"Note: {fallback_note}")
         if query.strip():
             lines.append(f"Showing only entries matching \"{query}\"")
         lines += ["Format: old value ⇒ new value (from the English wiki)", ""]
@@ -499,9 +499,9 @@ def do_patch_notes(scope: str = "arena", patch: str = "latest",
             official = _filter_official(
                 official, _query_zh_terms(query.strip(), matched_terms)) or None
 
-        lines = [f"📋 {scope_zh} patch 改動 — {notes['patch']}"]
+        lines = [f"{scope_zh} patch 改動 — {notes['patch']}"]
         if fallback_note:
-            lines.insert(0, f"ℹ️ {fallback_note}")
+            lines.insert(0, f"注意:{fallback_note}")
         if query.strip():
             shown = f"「{query}」"
             if matched_terms:
@@ -538,17 +538,17 @@ def do_patch_notes(scope: str = "arena", patch: str = "latest",
         lines.append("")
 
     if en:
-        src = "📌 Source: LoL Wiki (CC BY-SA)"
+        src = "Source: LoL Wiki (CC BY-SA)"
     elif official:
-        src = "📌 資料:Riot 官方繁中 patch notes(結構)+ LoL Wiki(CC BY-SA)"
+        src = "資料來源:Riot 官方繁中 patch notes(結構)+ LoL Wiki(CC BY-SA)"
     else:
-        src = "📌 資料:LoL Wiki(CC BY-SA)"
+        src = "資料來源:LoL Wiki(CC BY-SA)"
     if patch.strip().lower() in ("", "latest", "最新"):
         others = [t for t in titles[:5] if t != notes["patch"]]
         if others:
-            src += (f"\n💡 Older patches via the patch param: {', '.join(others[:3])}"
+            src += (f"\nTip: older patches via the patch param: {', '.join(others[:3])}"
                     if en else
-                    f"\n💡 也可以用 patch 參數查舊版,例如:{'、'.join(others[:3])}")
+                    f"\n提示:也可以用 patch 參數查舊版,例如:{'、'.join(others[:3])}")
     if stale:
         src += ("\n⚠️ Refresh failed; showing last cached data (may be outdated)."
                 if en else

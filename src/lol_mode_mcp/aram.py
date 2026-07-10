@@ -147,8 +147,8 @@ def do_aram_balance(champion: str) -> str:
     aram: dict[str, dict[str, float]] = wiki_result.data["aram"]
     entry = aram.get(champ.name_en)
 
-    header = f"🏔️ {champ.name_zh}({champ.name_en}){champ.title_zh and ' — ' + champ.title_zh}"
-    src = (f"📌 資料:LoL Wiki(CC BY-SA)· 模組更新於 {wiki_result.data['revision_time']}"
+    header = f"{champ.name_zh}({champ.name_en}){champ.title_zh and ' — ' + champ.title_zh}"
+    src = (f"資料來源:LoL Wiki(CC BY-SA)· 模組更新於 {wiki_result.data['revision_time']}"
            f" · 抓取於 {wiki_result.fetched_at_str}")
     if wiki_result.is_stale:
         src += "\n⚠️ 注意:資料更新失敗,以下為上次成功抓取的快取,可能過期。"
@@ -170,7 +170,7 @@ def do_aram_balance(champion: str) -> str:
 
 def do_mayhem_balance(champion: str) -> str:
     """ARAM: Mayhem 延伸目標的 stub —— 介面先留好,資料源接上後再實作。"""
-    return ("🚧 ARAM: Mayhem 的每英雄數值查詢**暫未支援**。\n"
+    return ("ARAM: Mayhem 的每英雄數值查詢**暫未支援**。\n"
             "Mayhem 有獨立的一組平衡數值與強化,穩定的結構化資料源"
             "還在評估中(LoL Wiki 的 Mayhem 資料模組)。"
             "目前可以先用 aram_balance 查一般 ARAM 的數值。")

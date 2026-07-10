@@ -181,6 +181,22 @@ src/lol_mode_mcp/
 
 ## 日誌
 
+- **2026-07-11**(去 AI 味改版:Hextech 風 + zhongiii 品牌):
+  使用者嫌「太 Claude 味」(裝飾 emoji、通用膠囊風)。已拍板:
+  Hextech 視覺 + 署名 zhongiii(GitHub 帳號不改)+ tool 輸出
+  「裝飾拿掉、語意保留」。
+  - 網站:Cinzel 襯線(標題/nav)、卡片圓角→2px + 金色角框
+    (.acard::before/::after L 形)、chips 膠囊→45° 切角(clip-path)、
+    背景極淡六角紋(body::before + SVG data URI)、
+    **個人強調色粉藍 --accent**(lang active/排序箭頭/連結 hover/
+    官方繁中原文標記)、by zhongiii 字標、Z 六角 favicon(data URI)。
+    主題鈕 ◐/◑(不用 emoji)。
+  - tool 輸出:⚔️🏔️📋🚧 標頭拿掉、📌→「資料來源:」、💡→「提示:」、
+    ℹ️→「注意:」;🟢🔴⚠️🔤 保留;稀有度 ⚪🟡🌈📦 視為階級色碼保留
+    (使用者若不要再拿)。
+  - 效能遺留驗證:prod Cache-Control/gzip 其實正常(先前量到 None
+    是冷啟動路徑假象);快取熱時第二請求 0.2s。
+  - 視覺細節(角框粗細/紋理濃淡/字體大小)待使用者實際看過再迭代。
 - **2026-07-11**(網站效能:使用者反映「其他人用卡卡的」):
   診斷:①/api/arena-balance 每個請求重算全部翻譯,實測 **6.2 秒/次**;
   ②無 gzip(161KB 裸傳)③無 Cache-Control ④Render 免費版冷啟動 30~60s。

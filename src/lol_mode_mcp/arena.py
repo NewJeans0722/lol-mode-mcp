@@ -174,9 +174,9 @@ def _source_line(result: cache.CacheResult, patch: str, locale: str) -> str:
         stale = ("\n⚠️ 注意:資料更新失敗,以下為上次成功抓取的快取,可能過期。"
                  if locale == "zh_tw" else
                  "\n⚠️ Warning: refresh failed; showing cached data that may be outdated.")
-    return (f"📌 資料:patch {patch} · CommunityDragon · 抓取於 {result.fetched_at_str}{stale}"
+    return (f"資料來源:patch {patch} · CommunityDragon · 抓取於 {result.fetched_at_str}{stale}"
             if locale == "zh_tw" else
-            f"📌 Data: patch {patch} · CommunityDragon · fetched {result.fetched_at_str}{stale}")
+            f"Data: patch {patch} · CommunityDragon · fetched {result.fetched_at_str}{stale}")
 
 
 def format_augment_detail(aug: Augment, locale: str) -> str:
@@ -190,9 +190,9 @@ def format_augment_detail(aug: Augment, locale: str) -> str:
     ]
     if "?" in aug.desc(locale):
         lines.append("")
-        lines.append("ℹ️ 「?」代表該數值由遊戲內即時計算(隨等級/裝備變動),離線資料無法確定。"
+        lines.append("說明:「?」代表該數值由遊戲內即時計算(隨等級/裝備變動),離線資料無法確定。"
                      if locale == "zh_tw" else
-                     "ℹ️ '?' marks values computed live in-game; not available offline.")
+                     "Note: '?' marks values computed live in-game; not available offline.")
     return "\n".join(lines)
 
 
