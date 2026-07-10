@@ -120,6 +120,31 @@
   .none { color: #3f4c61; }
   label.toggle { color: var(--muted); font-size: 13px; display: flex; gap: 6px; align-items: center; cursor: pointer; }
 
+  /* ---- 競技場平衡卡片 ---- */
+  .agrid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(470px, 1fr)); }
+  .acard { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .ahead { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .ahead img { width: 44px; height: 44px; border-radius: 8px; background: var(--panel-2); }
+  .ahead h3 { margin: 0; font-size: 16px; }
+  .ahead .en { color: var(--muted); font-size: 12px; margin-left: 6px; font-weight: 400; }
+  .ahead .title { color: var(--muted); font-size: 12px; }
+  .statchips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .statchip {
+    font-size: 12px; padding: 2px 10px; border-radius: 999px; border: 1px solid;
+  }
+  .statchip.buff { color: var(--buff); border-color: rgba(63,214,140,.45); }
+  .statchip.nerf { color: var(--nerf); border-color: rgba(255,107,107,.45); }
+  .ab { display: flex; gap: 10px; padding: 6px 0; border-top: 1px solid var(--line); }
+  .ab-k {
+    flex: none; min-width: 34px; text-align: center; align-self: flex-start;
+    color: var(--gold-bright); font-weight: 600; font-size: 13px;
+    background: var(--panel-2); border-radius: 6px; padding: 2px 8px; margin-top: 2px;
+  }
+  .ab ul { margin: 0; padding-left: 18px; font-size: 13px; color: #c9d2de; }
+  .ab li { margin: 2px 0; }
+  .ab li.sub { list-style-type: circle; margin-left: 14px; }
+  @media (max-width: 560px) { .agrid { grid-template-columns: 1fr; } }
+
   .status { color: var(--muted); padding: 40px 0; text-align: center; }
   .stale {
     background: #3a2d12; border: 1px solid #6e5320; color: #e8c778;
@@ -142,6 +167,7 @@
   <p class="sub" id="meta">載入中…</p>
   <nav>
     <button id="tab-aug" class="active">🌈 競技場海克斯圖鑑</button>
+    <button id="tab-arena">⚔️ 競技場平衡</button>
     <button id="tab-aram">🏔️ ARAM 平衡表</button>
   </nav>
 </header>
@@ -159,6 +185,18 @@
     <div class="status" id="aug-status">載入中…(伺服器若在休眠,喚醒約需 30~60 秒)</div>
   </section>
 
+  <!-- 競技場平衡 -->
+  <section id="page-arena" hidden>
+    <div class="toolbar">
+      <input type="search" id="arena-q" placeholder="搜尋英雄(中英文皆可)…">
+      <label class="toggle"><input type="checkbox" id="arena-only" checked> 只顯示有調整的英雄</label>
+      <span class="count" id="arena-count"></span>
+    </div>
+    <div id="arena-stale"></div>
+    <div class="agrid" id="arena-grid"></div>
+    <div class="status" id="arena-status">切到此分頁時載入…</div>
+  </section>
+
   <!-- ARAM -->
   <section id="page-aram" hidden>
     <div class="toolbar">
@@ -174,7 +212,7 @@
 
 <footer>
   資料來源:<a href="https://communitydragon.org/">CommunityDragon</a>(競技場強化與圖示)、
-  <a href="https://wiki.leagueoflegends.com/">League of Legends Wiki</a>(ARAM 數值,CC BY-SA 4.0)、
+  <a href="https://wiki.leagueoflegends.com/">League of Legends Wiki</a>(ARAM/競技場平衡數值,CC BY-SA 4.0)、
   Riot <a href="https://developer.riotgames.com/docs/lol#data-dragon">Data Dragon</a>(英雄資料)。
   本站與 <a href="https://github.com/NewJeans0722/lol-mode-mcp">lol-mode-mcp</a> 皆非 Riot Games 官方出品。
   同一網址亦提供 MCP 服務(<code>/mcp</code>),可加入 Claude 的 Connectors。
@@ -187,18 +225,19 @@ const TIERS = [
   ["all", "全部"], ["prismatic", "稜彩"], ["gold", "黃金"],
   ["silver", "白銀"], ["special", "特殊"],
 ];
-const state = { augs: null, aram: null, tier: "all", augQ: "", aramQ: "", sortKey: null, sortDir: -1 };
+const state = { augs: null, aram: null, arena: null, tier: "all", augQ: "", aramQ: "", arenaQ: "", sortKey: null, sortDir: -1 };
 
 /* ---------------- 分頁切換 ---------------- */
+const TABS = ["aug", "arena", "aram"];
 function showTab(which) {
-  $("page-aug").hidden = which !== "aug";
-  $("page-aram").hidden = which !== "aram";
-  $("tab-aug").classList.toggle("active", which === "aug");
-  $("tab-aram").classList.toggle("active", which === "aram");
+  for (const t of TABS) {
+    $("page-" + t).hidden = t !== which;
+    $("tab-" + t).classList.toggle("active", t === which);
+  }
   if (which === "aram" && !state.aram) loadAram();
+  if (which === "arena" && !state.arena) loadArena();
 }
-$("tab-aug").onclick = () => showTab("aug");
-$("tab-aram").onclick = () => showTab("aram");
+for (const t of TABS) $("tab-" + t).onclick = () => showTab(t);
 
 /* ---------------- 海克斯圖鑑 ---------------- */
 async function loadAugments() {
@@ -240,6 +279,59 @@ function renderAugs() {
     </div>`).join("");
 }
 $("aug-q").oninput = (e) => { state.augQ = e.target.value; renderAugs(); };
+
+/* ---------------- 競技場平衡 ---------------- */
+async function loadArena() {
+  try {
+    const r = await fetch("/api/arena-balance");
+    if (!r.ok) throw new Error((await r.json()).error || r.status);
+    state.arena = await r.json();
+    if (state.arena.stale) $("arena-stale").innerHTML = '<div class="stale">⚠️ 資料源更新失敗,顯示的是上次成功抓取的快取,可能過期。</div>';
+    $("arena-status").hidden = true;
+    renderArena();
+  } catch (e) {
+    $("arena-status").textContent = "載入失敗:" + e.message;
+  }
+}
+// "**粗體**"、"*斜體*" 是後端從 wiki 標記轉來的;先 escape 再轉標籤
+function richText(s) {
+  return esc(s).replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>").replace(/\*([^*]+)\*/g, "<i>$1</i>");
+}
+function statChip(labels, key, v) {
+  const cls = v > 0 ? "buff" : "nerf";
+  return `<span class="statchip ${cls}">${esc(labels[key] || key)} ${v > 0 ? "+" : ""}${v}</span>`;
+}
+function abilityBlock(ab) {
+  const items = ab.lines.map((ln) => {
+    const depth = (ln.match(/^ */)[0].length) / 2;   // 後端每層縮 2 格
+    return `<li class="${depth > 0 ? "sub" : ""}">${richText(ln.replace(/^ *- /, ""))}</li>`;
+  }).join("");
+  return `<div class="ab"><span class="ab-k">${esc(ab.label)}</span><ul>${items}</ul></div>`;
+}
+function renderArena() {
+  const q = state.arenaQ.trim().toLowerCase();
+  const onlyChanged = $("arena-only").checked;
+  const labels = state.arena.statLabels;
+  const list = state.arena.champions.filter((c) =>
+    (!onlyChanged || c.stats || c.abilities.length) &&
+    (!q || (c.nameZh + c.nameEn + c.id).toLowerCase().includes(q)));
+  $("arena-count").textContent = `顯示 ${list.length} 位英雄`;
+  $("arena-grid").innerHTML = list.map((c) => `
+    <div class="acard">
+      <div class="ahead">
+        <img src="${c.icon}" alt="" loading="lazy">
+        <div>
+          <h3>${esc(c.nameZh)}<span class="en">${esc(c.nameEn)}</span></h3>
+          <div class="title">${esc(c.titleZh)}</div>
+        </div>
+      </div>
+      ${c.stats ? `<div class="statchips">${Object.entries(c.stats).map(([k, v]) => statChip(labels, k, v)).join("")}</div>` : ""}
+      ${c.abilities.map(abilityBlock).join("")}
+      ${!c.stats && !c.abilities.length ? '<div class="none">本 patch 無競技場專屬調整</div>' : ""}
+    </div>`).join("");
+}
+$("arena-q").oninput = (e) => { state.arenaQ = e.target.value; renderArena(); };
+$("arena-only").onchange = () => renderArena();
 
 /* ---------------- ARAM 平衡表 ---------------- */
 async function loadAram() {

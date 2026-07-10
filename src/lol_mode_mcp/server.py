@@ -26,6 +26,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 
 from .aram import do_aram_balance, do_mayhem_balance
 from .arena import do_get_augment, do_list_augments
+from .arena_balance import do_arena_balance
 
 # logging 一律走 stderr:stdio transport 下 stdout 是 MCP 協定通道,
 # 印任何雜訊到 stdout 都會弄壞協定。
@@ -95,6 +96,21 @@ def aram_balance(champion: str) -> str:
 
 
 @mcp.tool()
+def arena_balance(champion: str) -> str:
+    """查詢英雄本 patch 的競技場(Arena)平衡調整,標明增益與削弱。
+
+    涵蓋:基礎數值加成(生命/攻擊/護甲/攻速的基礎值與成長值)
+    與逐技能改動(冷卻、傷害、係數等,取自英文 wiki)。
+    「無調整」與「查詢失敗」會明確區分。
+
+    Args:
+        champion: 英雄名稱,中英文皆可(例:「阿卡莉」、"Akali")。
+    """
+    logger.info("tool arena_balance(champion=%r)", champion)
+    return do_arena_balance(champion)
+
+
+@mcp.tool()
 def mayhem_balance(champion: str) -> str:
     """查詢英雄在 ARAM: Mayhem 模式的平衡數值(延伸功能,暫未支援)。
 
@@ -135,11 +151,12 @@ def mode_mechanics() -> str:
 # ---------------------------------------------------------------- 網頁介面
 # 同一個 HTTP server 順便掛查詢網頁(給人用)與 JSON API(給網頁的 JS 用);
 # MCP 客戶端仍走 /mcp,互不干擾。stdio 模式下這些路由不存在。
-from .web import api_aram, api_augments, home  # noqa: E402
+from .web import api_aram, api_arena_balance, api_augments, home  # noqa: E402
 
 mcp.custom_route("/", methods=["GET"])(home)
 mcp.custom_route("/api/augments", methods=["GET"])(api_augments)
 mcp.custom_route("/api/aram", methods=["GET"])(api_aram)
+mcp.custom_route("/api/arena-balance", methods=["GET"])(api_arena_balance)
 
 
 def main() -> None:

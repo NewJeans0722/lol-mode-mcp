@@ -9,8 +9,9 @@
 
 - MCP(給 Claude):`https://lol-mode-mcp.onrender.com/mcp`(v0.1.0)
 - 網頁(給人):`https://lol-mode-mcp.onrender.com/`
-  海克斯圖鑑(圖卡+搜尋+稀有度篩選)、ARAM 平衡表(可排序)。
-  同一個 server 三個出口:`/`、`/api/augments`+`/api/aram`、`/mcp`,
+  海克斯圖鑑(圖卡+搜尋+稀有度篩選)、競技場平衡(2026-07-10 新增,
+  本機完成待部署)、ARAM 平衡表(可排序)。
+  同一個 server 三個出口:`/`、`/api/*`、`/mcp`,
   共用資料層與快取(web.py + server.py 的 custom_route)。
 
 使用者已定案的範圍決定:
@@ -24,15 +25,15 @@
 使用者要求:競技場數值調整、英雄海克斯限定、完整機制(含投票)、
 相對上一版的 nerf/buff 要寫出來。偵察結論:
 
-1. **競技場每英雄數值調整 — 可做,兩個資料源都驗證過**
+1. ✅ **競技場每英雄數值調整 — 完成(2026-07-10,見日誌)**
    - 基礎數值:`Module:ChampionData/data` 的 `stats.ar` 區塊(45 英雄),
      欄位 hp_base/hp_lvl/dam_lvl/arm_lvl/as_lvl(對基礎值/成長值的加減)。
-     `aram.py 的 parse_champion_mode_data(content, 'ar')` 直接可用!
-   - 逐技能調整:`Module:MapChanges/data/ar`(~100KB),格式
-     `["Akali Q"] = [=[ * Base damage changed to {{ap|70 to 190}}. ]=]`,
-     需寫 wikitext 模板清理器({{ap|A to B}}→「A–B(隨等級)」、
-     {{as|X}}→X、{{tip|X}}→X、[[File:...]]→刪)。
-   - 實作:新 tool `arena_balance(champion)` + 網頁第三分頁。
+     已併入 aram.py 的 `_fetch_wiki_data`(同一次抓取,data 多個 "ar" key)。
+   - 逐技能調整:`Module:MapChanges/data/ar`(~100KB、587 條,
+     -- Champions/-- Items/-- Runes 三段),wikitext 清理器在 `wikitext.py`,
+     解析/分組/tool 在 `arena_balance.py`。
+   - 成品:tool `arena_balance(champion)` + 網頁「⚔️ 競技場平衡」分頁
+     (`/api/arena-balance`)。
 2. **投票機制 =「Vote Phase / Guests of Honor(貴賓)」— 資料在 Arena 主頁**
    - wiki 頁 `Arena`(11 萬字)有完整章節:Fame system、Champion select、
      Battlefields、Round structure、Shop/Combat/Vote Phase、
@@ -59,6 +60,7 @@
 - ✅ 專案骨架(uv + src layout + console script `lol-mode-mcp`)
 - ✅ `get_augment` / `list_augments`(競技場強化,中英雙語搜尋)
 - ✅ `aram_balance`(LoL Wiki Lua 模組解析,含英雄名中英正規化)
+- ✅ `arena_balance`(競技場基礎數值 + 逐技能調整;2026-07-10)
 - ✅ `mayhem_balance` stub(回「暫未支援」)
 - ✅ resource `lol-mode://mode-mechanics`(骨架 JSON,內容待作者校訂,搜 TODO)
 - ✅ 28 個單元測試全過;stdio 與 streamable-http 都用真 MCP client 驗證過
@@ -83,6 +85,9 @@ src/lol_mode_mcp/
   server.py      FastMCP 實例 + 4 tools + 1 resource + transport 切換(main)
   arena.py       競技場強化:抓取/雙語合併/模糊搜尋/排版
   aram.py        ARAM 數值:wiki Lua 模組解析/排版;mayhem stub
+                 (同一次抓取也解析競技場 "ar" 基礎數值區塊)
+  arena_balance.py 競技場每英雄調整:MapChanges/ar 解析、依英雄分組、tool
+  wikitext.py    wiki {{模板}}/[[連結]] → 純文字(只覆蓋 MapChanges 用到的)
   champions.py   英雄名正規化(Data Dragon en_US + zh_TW)
   formatting.py  @佔位符@ 代入 dataValues、HTML 標籤清理
   cache.py       記憶體 TTL 快取(12h),重抓失敗退回 stale 並標注
@@ -171,6 +176,28 @@ src/lol_mode_mcp/
 
 ## 日誌
 
+- **2026-07-10**(競技場擴充第 1 項):新 tool `arena_balance` + 網頁
+  「⚔️ 競技場平衡」分頁(`/api/arena-balance`)上線。實作重點:
+  - `wikitext.py`:模板清理器。語意都查過模板原始碼 ——
+    `{{ap}}`=隨技能等級、`{{pp}}`=隨英雄等級、`{{rd|A|B}}`=近戰A/遠程B
+    (Template:Range difference)、`{{ft|A|B}}`=兩種等價寫法取第一種
+    (Template:FlipText)。策略:反覆化簡「最內層」{{...}}(實測巢狀
+    最深 7 層大括號)。`{{tip|縮寫}}` 有中文對照表(er=效果半徑等)。
+  - `arena_balance.py`:MapChanges/data/ar 有 587 條(453 英雄/123 裝備
+    /11 符文,items/runes 也解析進快取備用)。條目 key 對 ddragon 名單
+    做最長前綴比對分組,453/453 全中;唯一別名:wiki 的 "Nunu" →
+    ddragon 的 "Nunu & Willump"(`_WIKI_NAME_ALIASES`)。技能標籤:
+    Q/W/E/R 原樣、I/P→被動、純英雄名→整體、具名技能(Nidalee Prowl)原樣。
+  - 基礎數值("ar" 區塊)併進 aram.py 同一次 wiki 抓取(cache key 不變,
+    data 多一個 "ar" key);MapChanges 是獨立 cache key
+    `wiki_mapchanges_ar`。兩源之一失敗仍出另一半結果,各自註明。
+  - 驗收:67 tests 全過(+22 wikitext、+8 arena_balance);HTTP 模式
+    真 MCP client 呼叫 5 tools、API 200(152/173 英雄有調整)、
+    網頁 JS 用 node + DOM stub 實跑 renderArena(152 卡片、過濾、
+    粗體轉換、無殘留 {{模板}})。**尚未 push / 部署**。
+  - 已知取捨:技能調整原文是英文 wiki(無中文源),數字與模板標注
+    已中文化;`{{ap|40 to 60}}%` 會排成「40−60(隨技能等級)%」,
+    % 落在括號後,可接受。
 - **2026-07-09**(session 1 續,Phase 3):Claude Desktop 是
   **Microsoft Store 版**,設定檔在
   `%LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\claude_desktop_config.json`

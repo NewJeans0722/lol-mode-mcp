@@ -21,6 +21,8 @@ from starlette.responses import HTMLResponse, JSONResponse
 from . import cache
 from .aram import FIELD_INFO, get_wiki_data
 from .arena import RARITY_INFO, get_arena_data
+from .arena_balance import (AR_STAT_LABELS, get_map_changes,
+                            group_champion_changes)
 from .champions import get_champions
 
 logger = logging.getLogger(__name__)
@@ -62,6 +64,37 @@ async def api_augments(_: Request) -> JSONResponse:
                 "icon": a.icon_url,
             }
             for a in data.augments
+        ],
+    }
+    return JSONResponse(payload)
+
+
+async def api_arena_balance(_: Request) -> JSONResponse:
+    try:
+        champs = get_champions()
+        wiki = get_wiki_data()      # 基礎數值(ar 區塊,與 ARAM 同一次抓取)
+        mc = get_map_changes()      # 逐技能調整
+    except cache.DataUnavailableError as exc:
+        return JSONResponse({"error": f"資料源連線失敗:{exc}"}, status_code=503)
+    ar = wiki.data.get("ar", {})
+    grouped = group_champion_changes(mc.data["champions"], champs.data)
+    payload = {
+        "revision_time": mc.data["revision_time"],
+        "fetched_at": mc.fetched_at_str,
+        "stale": champs.is_stale or wiki.is_stale or mc.is_stale,
+        "statLabels": AR_STAT_LABELS,
+        "champions": [
+            {
+                "id": c.id,
+                "nameZh": c.name_zh,
+                "nameEn": c.name_en,
+                "titleZh": c.title_zh,
+                "icon": c.icon_url,
+                "stats": ar.get(c.name_en),                # None = 無基礎數值調整
+                "abilities": [{"label": label, "lines": lines}
+                              for label, lines in grouped.get(c.name_en, [])],
+            }
+            for c in sorted(champs.data, key=lambda c: c.name_en)
         ],
     }
     return JSONResponse(payload)

@@ -71,7 +71,7 @@ def parse_champion_mode_data(lua_text: str, mode_key: str = "aram") -> dict[str,
 
 
 def _fetch_wiki_data() -> dict:
-    """抓 wikitext 並解析 aram 區塊;把解析結果與原文一起放進快取。"""
+    """抓 wikitext 並解析 aram 與 ar(競技場基礎數值)區塊,一次快取兩者。"""
     raw = fetch_json(WIKI_API, params={
         "action": "query", "prop": "revisions", "rvprop": "content|timestamp",
         "rvslots": "main", "titles": MODULE_TITLE,
@@ -83,9 +83,12 @@ def _fetch_wiki_data() -> dict:
     if not aram:
         # 結構若大改導致解析出 0 筆,寧可當成失敗(觸發退回舊快取)
         raise ValueError("parsed 0 aram entries from wiki module — structure may have changed")
-    logger.info("wiki aram data parsed: %d champions with changes (revision %s)",
-                len(aram), rev.get("timestamp", "?"))
-    return {"aram": aram, "revision_time": rev.get("timestamp", "unknown")}
+    # ar 區塊只有 ~45 隻英雄有,0 筆不當失敗(競技場輪替下架時可能真的沒有)
+    ar = parse_champion_mode_data(content, "ar")
+    logger.info("wiki mode data parsed: %d aram / %d arena champions (revision %s)",
+                len(aram), len(ar), rev.get("timestamp", "?"))
+    return {"aram": aram, "ar": ar,
+            "revision_time": rev.get("timestamp", "unknown")}
 
 
 def get_wiki_data() -> cache.CacheResult:
