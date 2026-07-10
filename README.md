@@ -21,9 +21,10 @@ LoL「模式限定」資料的 MCP server —— 競技場(Arena)海克斯強化
 3. 名稱隨意填(例如 `LoL 模式資料`),網址貼上:
 
    ```
-   https://<部署後的公開網址>/mcp
+   https://lol-mode-mcp.onrender.com/mcp
    ```
-   <!-- TODO(Phase 3): 部署到 FastMCP Cloud 後把真實網址填進來,並補上設定畫面截圖 -->
+
+   > 💡 伺服器閒置 15 分鐘會休眠,第一個問題可能要等 30~60 秒喚醒,之後就是正常速度。
 
 4. 儲存後開新對話,直接問:「灼燒煉金那個強化在做什麼」、「悟空的 ARAM 有被削嗎」
 
@@ -51,11 +52,15 @@ uv run lol-mode-mcp                     # 直接啟動(stdio)
 }
 ```
 
-## 部署(FastMCP Cloud)
+## 部署(Render 免費方案)
 
 1. push 到 GitHub([NewJeans0722/lol-mode-mcp](https://github.com/NewJeans0722/lol-mode-mcp))
-2. 在 [FastMCP Cloud](https://fastmcp.cloud) 連結 repo,**entrypoint 填 `server.py:mcp`**(repo 根目錄的部署入口;不要指到 src/ 底下,那個檔案以路徑載入時相對匯入會失敗)
-3. 取得公開網址;之後每次 push 自動重新部署,朋友端不需任何動作
+2. [Render](https://render.com) → New → Blueprint → 選這個 repo(設定都在 `render.yaml`)
+3. 取得公開網址;之後每次 push 到 main 自動重新部署,朋友端不需任何動作
+
+> 曾嘗試 FastMCP Cloud,但其免費方案的伺服器強制 Horizon 帳號驗證
+> (公開存取要付費),不符合「朋友貼網址就能用」的目標,故改用 Render。
+> repo 根目錄的 `server.py` 是為 FastMCP Cloud 準備的入口,保留備用。
 
 環境變數:
 
