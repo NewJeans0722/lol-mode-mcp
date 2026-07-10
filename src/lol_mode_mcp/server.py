@@ -22,6 +22,7 @@ import sys
 from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 
 from .aram import do_aram_balance, do_mayhem_balance
 from .arena import do_get_augment, do_list_augments
@@ -45,6 +46,12 @@ mcp = FastMCP(
         "ARAM 每英雄平衡數值。所有查詢支援中文(繁體)與英文名稱。"
     ),
     stateless_http=True,
+    # SDK 預設的 DNS rebinding 防護只放行 localhost 的 Host header,
+    # 部署在雲端(Render 等)會對正常請求回 421 Misdirected Request。
+    # 這防護是保護「跑在本機的 HTTP server」不被惡意網頁跨站打,
+    # 對公開雲端服務(只供公開遊戲資料、無任何秘密)關掉是安全的。
+    transport_security=TransportSecuritySettings(
+        enable_dns_rebinding_protection=False),
 )
 
 
