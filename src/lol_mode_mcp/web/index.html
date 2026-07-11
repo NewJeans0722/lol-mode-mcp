@@ -773,7 +773,6 @@ async function loadMech() {
     $("mech-status").textContent = "載入失敗:" + e.message;
   }
 }
-const MECH_PHASE = { 0: "任一輪", 1: "第一輪投票", 2: "第二輪投票" };
 function renderMech() {
   const modes = [["arena", "競技場"], ["mayhem", "ARAM Mayhem"]];
   $("mech-modes").innerHTML = modes.map(([m, label]) =>
@@ -793,7 +792,7 @@ function renderMech() {
           <div class="ahead">
             ${g.icon ? `<img src="${g.icon}" alt="" loading="lazy">` : ""}
             <div><h3>${esc(g.nameZh || g.nameEn)}<span class="en">${esc(g.nameEn)}</span></h3>
-            <div class="title">${MECH_PHASE[g.phase] || ""}</div></div>
+            <div class="title">${esc(g.rule || "")}</div></div>
           </div>
           <div style="color:var(--desc);font-size:13px">${esc(g.effect)}</div>
         </div>`).join("") + `</div>`;

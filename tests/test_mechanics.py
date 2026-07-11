@@ -25,7 +25,11 @@ def test_mechanics_json_shape():
     assert any("貴賓" in t for t in topics)
     guests = next(s for s in arena["sections"] if "guests" in s)["guests"]
     assert len(guests) >= 15
-    assert all({"nameEn", "phase", "effect"} <= set(g) for g in guests)
+    assert all({"nameEn", "nameZh", "rule", "effect"} <= set(g) for g in guests)
+    # 現役名單(2026 S2)必須有 26.09 新貴賓,不得殘留舊輪替專屬者
+    names = {g["nameEn"] for g in guests}
+    assert {"Kindred", "Lux", "Nocturne", "Locke"} <= names
+    assert "Ambessa" not in names and "Vladimir" not in names
     # 誠實聲明必須在
     flat = str(arena["sections"])
     assert "未公開" in flat

@@ -191,6 +191,18 @@ src/lol_mode_mcp/
 
 ## 日誌
 
+- **2026-07-11**(貴賓名單勘誤,使用者抓到的):
+  - ⚠️ **wiki Arena 頁的貴賓詳表是舊輪替**(諾克薩斯主題,頁面最後編輯
+    2026-06-13、早於 26.13;甚至沒有 26.09 就上場的鏡爪/拉克絲/夜曲)。
+    我第一版名單就是抓了這張,錯的。
+  - **正解來源:官方繁中 26.09 notes 的「特別嘉賓」段**(2026 S2 現役
+    16 新 + 斯溫/卡特蓮娜重製)+ 26.13 增修(洛克新增、鏡爪/拉克絲/
+    夜曲調整)。名單已重建進 mode_mechanics.json(19 位,官方 zh 名 +
+    規則名;官方只公布規則名者註明「詳細效果以遊戲內為準」,
+    不從舊 wiki 表腦補)。guest 結構改 {nameEn,nameZh,rule,effect},
+    phase 移除(新輪替未公布)。
+  - **教訓:貴賓/輪替型內容一律以官方 notes 為準,wiki 會滯後一整個
+    輪替**;JSON 內也留了警語。亞塔坎非英雄,icon 查不到屬正常。
 - **2026-07-11**(mayhem_balance 實作 + Patch 圖示 + 機制去 ARAM):
   - **mayhem_balance 不再是 stub**:資料源 = wiki「ARAM: Mayhem」頁
     List of mode overrides 的 Champions 表(tabber;38 隻英雄,

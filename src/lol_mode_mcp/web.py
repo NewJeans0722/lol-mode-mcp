@@ -349,8 +349,8 @@ def _mechanics_payload() -> dict:
     for sec in data.get("arena", {}).get("sections", []):
         for g in sec.get("guests", []):
             c = champs.get(g["nameEn"])
-            g["nameZh"] = c.name_zh if c else g["nameEn"]
-            g["icon"] = c.icon_url if c else ""
+            g.setdefault("nameZh", c.name_zh if c else g["nameEn"])
+            g["icon"] = c.icon_url if c else ""  # 亞塔坎等非英雄查不到,留空
     return data
 
 

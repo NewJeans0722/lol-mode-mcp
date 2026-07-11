@@ -47,15 +47,14 @@ def do_mode_mechanics(mode: str = "arena") -> str:
         return ("看不懂模式「%s」。可查:arena(競技場)、aram(嚎哭深淵)、"
                 "mayhem(ARAM: Mayhem)。" % mode)
     section = data[key]
-    phase_label = {0: "任一輪", 1: "第一輪", 2: "第二輪"}
     lines = [f"{section['name_zh']} — 模式機制"]
     for sec in section["sections"]:
         lines += ["", f"【{sec['topic']}】"]
         lines += [f"- {ln}" for ln in sec.get("lines", [])]
         for g in sec.get("guests", []):
-            zh = _guest_zh(g["nameEn"])
-            lines.append(f"▸ {zh}({g['nameEn']},{phase_label.get(g['phase'], '?')})"
-                         f":{g['effect']}")
+            zh = g.get("nameZh") or _guest_zh(g["nameEn"])
+            rule = f"「{g['rule']}」" if g.get("rule") else ""
+            lines.append(f"▸ {zh}({g['nameEn']}){rule}:{g['effect']}")
     lines += ["", f"資料來源:{data['_meta']['sources']};"
                   f"整理於 {data['_meta']['last_reviewed']}"]
     return "\n".join(lines)
