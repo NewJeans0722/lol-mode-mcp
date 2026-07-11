@@ -148,13 +148,19 @@ def _fetch_mayhem_codex() -> list[dict]:
     for e in entries:
         key = _name_key(e["nameEn"])
         raw_zh = official.get(base_names.get(key, ""))
+        official_zh = (render_description(raw_zh, {}, locale="zh_tw")
+                       if raw_zh and "@" not in raw_zh else None)
+        # 官方字串是「遊戲內簡短摘要」,常砍掉數值細節;只有在長度接近
+        # 英文完整說明時才可信,否則寧可走人工/規則(見 NOTES 2026-07-12)。
+        official_ok = (official_zh is not None
+                       and len(re.sub(r"\s", "", official_zh))
+                       >= 0.55 * len(re.sub(r"\s", "", e["desc"])))
         if e["nameEn"] in curated:
             e["descZh"] = curated[e["nameEn"]]
             e["descComplete"] = True
             n_curated += 1
-        elif raw_zh and "@" not in raw_zh:
-            # 官方 zh(無佔位符):清標籤後直接用,最高品質
-            e["descZh"] = render_description(raw_zh, {}, locale="zh_tw")
+        elif official_ok:
+            e["descZh"] = official_zh
             e["descComplete"] = True
             n_official += 1
         else:

@@ -211,9 +211,16 @@ src/lol_mode_mcp/
     日炎聖盾、巴米灰燼、虛偽光彩、探索者護腕、蒐集者 —— 初版全猜錯)。
   - translate.py 加 `translate_description`(逐句)、`_DESC_STRUCTURES`
     (Grants/Increases…by 句型)。tool/web 改用 descZh,不完整處註記。
-  - **已 100%**:23 個長說明全人工翻完(數值對英文 wiki、技能名查
-    ddragon:魅火/堅毅詠嘆調/迅捷奏鳴曲)。日後 wiki 若新增/改強化,
-    以本 session 的 gap 腳本量測、補進 mayhem_zh.json(key = 英文強化名)。
+  - **已 100%(206 條人工對照)**。⚠️ **抽查發現的重要修正**:
+    先前用的官方遊戲字串 `cherry_{名}_summary` 其實是「遊戲內簡短摘要」,
+    69/76 個把數值細節全砍掉(如雙修大師只剩「普攻可累加魔攻」、
+    惡趣味只剩「使你回復生命」)。→ 加長度守門(官方 zh 需 ≥ 英文
+    0.55 倍才採用),不合格者改人工翻譯全文(數值對英文 wiki)。
+    符文/技能名查 ddragon:征服者/致命節奏/靈魂收割/先發制人/
+    裂地衝擊/冰川增幅、魅火/堅毅詠嘆調/迅捷奏鳴曲/背刺/欺詐魔術/泰貝爾。
+  - 日後 wiki 若新增/改強化,以本 session 的 gap 腳本量測、補進
+    mayhem_zh.json(key = 英文強化名)。**教訓:官方字串表的 _summary
+    是摘要非全文,要用 _tooltipdescription 或直接人工翻英文 wiki 全文。**
 - **2026-07-11**(強化查詢工具分模式):get_augment / list_augments
   加 `mode` 參數("arena" 預設 / "mayhem")。兩套強化有 **98 個同名**
   (一轉就贏、火狐等)但數值/效果可能不同,查到同名時雙向提示另一
