@@ -24,7 +24,8 @@ from pathlib import Path
 from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 
-from .aram import do_aram_balance, do_mayhem_balance
+from .aram import do_aram_balance
+from .mayhem_augments import do_mayhem_balance
 from .arena import do_get_augment, do_list_augments
 from .arena_balance import do_arena_balance
 from .mechanics import do_mode_mechanics
@@ -150,10 +151,13 @@ def mode_mechanics(mode: str = "arena") -> str:
 
 @mcp.tool()
 def mayhem_balance(champion: str) -> str:
-    """查詢英雄在 ARAM: Mayhem 模式的平衡數值(延伸功能,暫未支援)。
+    """查詢英雄在 ARAM: Mayhem 的平衡:一般 ARAM 補正 + Mayhem 專屬覆寫。
+
+    Mayhem 疊加在一般 ARAM 補正之上,兩層都會列出;
+    專屬覆寫僅部分英雄有(取自英文 wiki,規則式翻譯)。
 
     Args:
-        champion: 英雄名稱,中英文皆可。
+        champion: 英雄名稱,中英文皆可(例:「巴德」、"Bard")。
     """
     logger.info("tool mayhem_balance(champion=%r)", champion)
     return do_mayhem_balance(champion)

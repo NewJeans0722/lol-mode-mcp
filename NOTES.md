@@ -191,6 +191,24 @@ src/lol_mode_mcp/
 
 ## 日誌
 
+- **2026-07-11**(mayhem_balance 實作 + Patch 圖示 + 機制去 ARAM):
+  - **mayhem_balance 不再是 stub**:資料源 = wiki「ARAM: Mayhem」頁
+    List of mode overrides 的 Champions 表(tabber;38 隻英雄,
+    General/Abilities 兩欄),parse_mayhem_overrides 解析
+    (mayhem_augments.py)。輸出兩層:一般 ARAM 補正(Mayhem 亦適用,
+    使用者確認過這層關係)+ Mayhem 專屬覆寫(規則式翻譯 + 技能台服名)。
+    ChampionData 模組沒有 kiwi/mayhem 區塊(已再查證)。
+  - **Patch 改動條目圖示**:強化(競技場 cdragon + Mayhem codex)、
+    裝備(ddragon item.json 補 en/zh→icon 映射)、英雄(既有)。
+    ⚠️ 兩個踩坑:①正則裡直接打全形括號會被工具鏈降成半形,
+    要寫「(」「)」時務必驗證 pattern 碼位或用 \\uFF08;
+    ②官方 notes 的間隔號用 U+FF0E(睿娜妲.格萊斯克),ddragon 用
+    U+2027(‧),英雄 zh 名比對要去間隔號+去括號尾註(web.py _zh_key)。
+    無法補的圖示:已停用/未收錄 cdragon 的強化(風險計算、咒法等)、
+    「日蝕/集識心智」等官方 notes 與遊戲字串譯名不一致者(不硬 alias)。
+  - **機制分頁**只留 競技場/ARAM Mayhem 兩個 chips(使用者只要
+    Mayhem);mayhem 段落加「繼承一般 ARAM 的基礎規則」節;
+    JSON 的 aram key 保留給 tool/resource。
 - **2026-07-11**(機制功能 + Mayhem 圖鑑 + 選單重排):
   - **偵察結論(重要,別再查)**:強化的英雄限定名單與出現機率
     **不存在於任何公開來源**——官網 notes、wiki 三頁、cdragon

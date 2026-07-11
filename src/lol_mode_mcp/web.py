@@ -16,6 +16,7 @@ import gzip
 import json
 import logging
 import os
+import re
 from pathlib import Path
 
 from starlette.requests import Request
@@ -173,30 +174,93 @@ def _patch_notes_payload(patch: str, scope: str) -> dict:
         off = get_official_zh(notes["patch"])
         official = off.data["scopes"].get(scope)
         if official:
-            zh_champs = {c.name_zh: c for c in get_champions().data}
+            # 官方 notes 的中文名會帶全形括號尾註(慨影(詭影刺客))、
+            # 間隔號字元也可能不同(睿娜妲.格萊斯克 vs ‧),正規化後比對
+            def _zh_key(name: str) -> str:
+                # 間隔號各種寫法(U+FF0E/2027/00B7/30FB/半形點)一律去除
+                return re.sub(r"[.．‧·・\s]", "",
+                              _PAREN_TAIL.sub("", name))
+            zh_champs = {_zh_key(c.name_zh): c for c in get_champions().data}
+            def _champ_of(name: str):
+                return zh_champs.get(_zh_key(name))
             categories_zh = [{
                 "category": c["category"],
                 "entries": [{
                     "name": e["name"],
-                    "nameEn": (zh_champs[e["name"]].name_en
-                               if e["name"] in zh_champs else None),
-                    "icon": (zh_champs[e["name"]].icon_url
-                             if e["name"] in zh_champs else None),
+                    "nameEn": (ch.name_en if (ch := _champ_of(e["name"])) else None),
+                    "icon": ch.icon_url if ch else None,
                     "lines": e["lines"],
                 } for e in c["entries"]],
             } for c in official]
     except Exception as exc:  # noqa: BLE001 — 官方頁失敗不影響主資料
         logger.warning("official zh notes unavailable: %s", exc)
 
+    categories = enrich_categories(notes["scopes"].get(scope, []))
+    _attach_entity_icons(categories, categories_zh)  # 強化/裝備圖示
     return {
         "patch": notes["patch"],
         "patches": titles[:16],  # 給下拉選單
         "scope": scope,
         "fetched_at": fetched,
         "stale": stale,
-        "categories": enrich_categories(notes["scopes"].get(scope, [])),
+        "categories": categories,
         "categoriesZh": categories_zh,
     }
+
+
+# 全形/半形括號尾註(如「慨影(詭影刺客)」);全形括號用 unicode 跳脫明確寫
+_PAREN_TAIL = re.compile(r"\s*[(（][^)）]*[)）]\s*$")
+
+
+def _entity_icons() -> tuple[dict, dict]:
+    """(en 正規化名→圖示, zh 名→圖示):競技場/Mayhem 強化 + 裝備。"""
+    from .mayhem_augments import get_mayhem_codex
+    from .patch_notes import _name_key, get_item_names
+    en_map: dict[str, str] = {}
+    zh_map: dict[str, str] = {}
+    try:
+        for a in get_arena_data().data.augments:
+            if a.icon_url:
+                en_map[_name_key(a.name_en)] = a.icon_url
+                if a.name_zh:
+                    zh_map[a.name_zh] = a.icon_url
+    except cache.DataUnavailableError:
+        pass
+    try:
+        for e in get_mayhem_codex().data:
+            if e["icon"]:
+                en_map.setdefault(_name_key(e["nameEn"]), e["icon"])
+                if e["nameZh"]:
+                    zh_map.setdefault(e["nameZh"], e["icon"])
+    except cache.DataUnavailableError:
+        pass
+    try:
+        items = get_item_names().data
+        for k, v in items.get("en_to_icon", {}).items():
+            en_map.setdefault(k, v)
+        for k, v in items.get("zh_to_icon", {}).items():
+            zh_map.setdefault(k, v)
+    except cache.DataUnavailableError:
+        pass
+    return en_map, zh_map
+
+
+def _attach_entity_icons(categories: list[dict], categories_zh) -> None:
+    """Patch 條目補強化/裝備圖示(英雄圖示既有邏輯已處理)。"""
+    from .patch_notes import _name_key
+    en_map, zh_map = _entity_icons()
+    for c in categories or []:
+        for e in c["entries"]:
+            if not e.get("icon"):
+                key = _name_key(_PAREN_TAIL.sub("", e["name"]))
+                e["icon"] = en_map.get(key) or (
+                    zh_map.get(_PAREN_TAIL.sub("", e["nameZh"]))
+                    if e.get("nameZh") else None)
+    for c in categories_zh or []:
+        for e in c["entries"]:
+            if not e.get("icon"):
+                base = _PAREN_TAIL.sub("", e["name"]).strip()
+                e["icon"] = zh_map.get(base) or zh_map.get(e["name"])
 
 
 async def api_patch_notes(request: Request) -> Response:

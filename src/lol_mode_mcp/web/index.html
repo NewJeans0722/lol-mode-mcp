@@ -775,7 +775,7 @@ async function loadMech() {
 }
 const MECH_PHASE = { 0: "任一輪", 1: "第一輪投票", 2: "第二輪投票" };
 function renderMech() {
-  const modes = [["arena", "競技場"], ["aram", "ARAM"], ["mayhem", "ARAM Mayhem"]];
+  const modes = [["arena", "競技場"], ["mayhem", "ARAM Mayhem"]];
   $("mech-modes").innerHTML = modes.map(([m, label]) =>
     `<button class="chip ${state.mechMode === m ? "active" : ""}" data-m="${m}">${label}</button>`).join("");
   for (const b of $("mech-modes").children)

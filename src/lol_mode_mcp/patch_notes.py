@@ -206,14 +206,20 @@ def _fetch_item_names() -> dict[str, dict[str, str]]:
     en = fetch_json(ITEM_URL.format(ver=ver, locale="en_US"))["data"]
     zh_to_en: dict[str, str] = {}
     en_to_zh: dict[str, str] = {}
+    en_to_icon: dict[str, str] = {}
+    zh_to_icon: dict[str, str] = {}
     for iid, item_zh in zh.items():
         item_en = en.get(iid)
         if not item_en or not item_zh.get("name"):
             continue
+        icon = f"https://ddragon.leagueoflegends.com/cdn/{ver}/img/item/{iid}.png"
         zh_to_en[item_zh["name"]] = item_en["name"]
         en_to_zh[item_en["name"].lower()] = item_zh["name"]
+        en_to_icon[_name_key(item_en["name"])] = icon
+        zh_to_icon[item_zh["name"]] = icon
     logger.info("item name map loaded: %d items (ddragon %s)", len(zh_to_en), ver)
-    return {"zh_to_en": zh_to_en, "en_to_zh": en_to_zh}
+    return {"zh_to_en": zh_to_en, "en_to_zh": en_to_zh,
+            "en_to_icon": en_to_icon, "zh_to_icon": zh_to_icon}
 
 
 def get_item_names() -> cache.CacheResult:
