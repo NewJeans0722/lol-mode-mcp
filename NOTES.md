@@ -191,14 +191,14 @@ src/lol_mode_mcp/
 
 ## 日誌
 
-- **2026-07-12**(Mayhem 強化說明中文化 = 0%→89%):使用者:
+- **2026-07-12**(Mayhem 強化說明中文化 = 0%→**100%**):使用者:
   「你也沒翻譯,請按照先前規格處理好」。Mayhem 圖鑑原本只顯示英文說明。
   - **descZh 三層來源(mayhem_augments.py `_fetch_mayhem_codex`)**:
     ① 人工整段翻譯 `data/mayhem_zh.json`(以英文強化名為 key,穩定)
     ② 官方遊戲字串表 zh_tw `cherry_{內部名}_summary`,**僅無 @佔位符@ 時採用**
     ③ 對英文 wiki 說明跑 `translate.translate_description`(規則式)。
-    覆蓋:121 curated + 64 官方 + 12 規則 = **197/220(89%)**;
-    餘 23 為超長多段說明(最長 1730 字),顯示部分翻譯 + 註記,待續。
+    覆蓋:144 curated + 64 官方 + 12 規則 = **220/220(100%)**;
+    最長 1730 字(Spin Me Right Round)也已人工翻完。
   - 🔎 **重要發現**:官方 Mayhem 強化中文說明**存在**於遊戲字串表
     (`game/zh_tw/.../lol.stringtable.json` 的 `cherry_*_summary`),
     但 136/220 有、其中 72 個帶 @佔位符@ 需 Mayhem dataValues
@@ -211,9 +211,9 @@ src/lol_mode_mcp/
     日炎聖盾、巴米灰燼、虛偽光彩、探索者護腕、蒐集者 —— 初版全猜錯)。
   - translate.py 加 `translate_description`(逐句)、`_DESC_STRUCTURES`
     (Grants/Increases…by 句型)。tool/web 改用 descZh,不完整處註記。
-  - **待續**:剩 23 個長說明(Spin Me Right Round/Dimension Shift/
-    Triggered Inferno/Sonata/From Downtown/Blade Waltz/Hellbent 等),
-    翻好補進 mayhem_zh.json 即到 100%。量測用 NOTES 這段的 gap 腳本。
+  - **已 100%**:23 個長說明全人工翻完(數值對英文 wiki、技能名查
+    ddragon:魅火/堅毅詠嘆調/迅捷奏鳴曲)。日後 wiki 若新增/改強化,
+    以本 session 的 gap 腳本量測、補進 mayhem_zh.json(key = 英文強化名)。
 - **2026-07-11**(強化查詢工具分模式):get_augment / list_augments
   加 `mode` 參數("arena" 預設 / "mayhem")。兩套強化有 **98 個同名**
   (一轉就贏、火狐等)但數值/效果可能不同,查到同名時雙向提示另一
