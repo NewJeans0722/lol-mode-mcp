@@ -315,10 +315,11 @@ async def api_aram(request: Request) -> Response:
 
 
 def _mayhem_augments_payload() -> dict:
-    from .mayhem_augments import TIER_INFO, get_mayhem_codex
+    from .mayhem_augments import _MODULE_META, TIER_INFO, get_mayhem_codex
     result = get_mayhem_codex()
     return {
         "fetched_at": result.fetched_at_str,
+        "revised": _MODULE_META.get("revised", "unknown"),
         "stale": result.is_stale,
         "note": "中文說明:官方遊戲字串優先,其餘為人工/規則翻譯;數值以英文 wiki 為準,名稱為台服官方譯名。",
         "augments": [

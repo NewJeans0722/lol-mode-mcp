@@ -45,6 +45,9 @@ _FIELD_RE = re.compile(r'\[\"(\w+)\"\]\s*=\s*\"((?:[^\"\\\\]|\\\\.)*)\"')
 
 TIER_INFO = {"silver": "白銀", "gold": "黃金", "prismatic": "稜彩"}
 
+# wiki 模組最後編輯時間(說明來源新鮮度);於實際抓取時更新,供 UI 顯示。
+_MODULE_META = {"revised": "unknown"}
+
 
 def parse_mayhem_module(lua_text: str) -> list[dict]:
     """Lua 模組 → [{"nameEn", "desc", "tier"}](desc 已清成純文字)。"""
@@ -89,12 +92,14 @@ def _icon_url(path: str) -> str:
 
 def _fetch_mayhem_codex() -> list[dict]:
     raw = fetch_json(WIKI_API, params={
-        "action": "query", "prop": "revisions", "rvprop": "content",
+        "action": "query", "prop": "revisions", "rvprop": "content|timestamp",
         "rvslots": "main", "titles": MODULE_TITLE,
         "format": "json", "formatversion": "2",
     })
-    entries = parse_mayhem_module(
-        raw["query"]["pages"][0]["revisions"][0]["slots"]["main"]["content"])
+    rev = raw["query"]["pages"][0]["revisions"][0]
+    # 說明來源 wiki 模組的最後編輯時間;供 UI 顯示「資料新鮮度」
+    _MODULE_META["revised"] = rev.get("timestamp", "unknown")
+    entries = parse_mayhem_module(rev["slots"]["main"]["content"])
     if not entries:
         raise ValueError("parsed 0 mayhem augments — module structure changed?")
 

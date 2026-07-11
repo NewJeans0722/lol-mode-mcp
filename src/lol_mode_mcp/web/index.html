@@ -596,8 +596,18 @@ function renderAugs() {
     (state.tier === "all" || a.tier === state.tier) &&
     (!q || (a.nameZh + a.nameEn + (a.descZh || a.desc || "") + (a.descEn || "")).toLowerCase().includes(q)));
   $("aug-count").textContent = `顯示 ${list.length} 個`;
-  $("aug-note").innerHTML = mayhem && state.maug
-    ? `<div class="stale">${esc(state.maug.note)}</div>` : "";
+  // 頂部與說明列都反映「目前分頁」的資料新鮮度,確保看到的是最新版本
+  if (mayhem && state.maug) {
+    const m = state.maug;
+    $("meta").innerHTML = `ARAM Mayhem · 說明來源 wiki 模組更新於 <span class="patch">${esc((m.revised||"").slice(0,10))}</span> · 抓取 ${esc(m.fetched_at||"")} · ${m.augments.length} 個強化`;
+    $("aug-note").innerHTML =
+      (m.stale ? '<div class="stale">⚠️ 資料源更新失敗,顯示上次成功抓取的快取,可能過期。</div>' : "") +
+      `<div class="stale">${esc(m.note)}(名稱/圖示取自 Data Dragon 最新版)</div>`;
+  } else if (state.augs) {
+    $("meta").innerHTML = `patch <span class="patch">${state.augs.patch}</span> · 資料更新 ${state.augs.fetched_at} · ${state.augs.augments.length} 個強化`;
+    $("aug-note").innerHTML = state.augs.stale
+      ? '<div class="stale">⚠️ 資料源更新失敗,顯示上次成功抓取的快取,可能過期。</div>' : "";
+  }
   const zh = state.lang === "zh";
   $("aug-grid").innerHTML = list.map((a) => {
     const descZh = a.descZh !== undefined ? a.descZh : a.desc;
