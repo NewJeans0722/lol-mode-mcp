@@ -447,10 +447,11 @@ $("theme-btn").onclick = () =>
 try { setTheme(localStorage.getItem("theme") || "dark"); } catch (e) {}
 
 /* ---------------- 背景原畫(官方 splash,左右雙欄) ---------------- */
-// 預設:兩側皆「無」,想看原畫自己從選單挑;選過的會記住(bgRight/bgLeft)。
+// 預設:兩側皆「無」,想看原畫自己從選單挑;選過的會記住。
+// 儲存鍵 v2:上一版曾把舊預設寫進訪客的 localStorage,升版讓大家重置一次。
 const BG_SIDES = {
-  right: { el: "bg", sel: "bg-select", store: "bgRight", def: () => "" },
-  left:  { el: "bg-left", sel: "bg-left-select", store: "bgLeft", def: () => "" },
+  right: { el: "bg", sel: "bg-select", store: "bgRight2", def: () => "" },
+  left:  { el: "bg-left", sel: "bg-left-select", store: "bgLeft2", def: () => "" },
 };
 function setBg(side, v) {
   const cfg = BG_SIDES[side];
