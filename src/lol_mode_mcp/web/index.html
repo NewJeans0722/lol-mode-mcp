@@ -320,10 +320,11 @@
   <h1>LoL <span class="gold">模式資料庫</span><span class="byline">by zhongiii</span></h1>
   <p class="sub" id="meta">載入中…</p>
   <nav>
-    <button id="tab-aug" class="active">競技場海克斯圖鑑</button>
+    <button id="tab-aug" class="active">海克斯圖鑑</button>
     <button id="tab-arena">競技場平衡</button>
+    <button id="tab-aram">ARAM 平衡</button>
     <button id="tab-patch">Patch 改動</button>
-    <button id="tab-aram">ARAM 平衡表</button>
+    <button id="tab-mech">機制</button>
     <div class="langs">
       <button id="lang-zh" class="active">中</button>
       <button id="lang-en">EN</button>
@@ -336,13 +337,15 @@
 </header>
 
 <main>
-  <!-- 海克斯圖鑑 -->
+  <!-- 海克斯圖鑑(競技場 / ARAM Mayhem) -->
   <section id="page-aug">
     <div class="toolbar">
+      <div class="chips" id="aug-modes"></div>
       <input type="search" id="aug-q" placeholder="搜尋強化名稱或效果(中英文皆可)…">
       <div class="chips" id="aug-chips"></div>
       <span class="count" id="aug-count"></span>
     </div>
+    <div id="aug-note"></div>
     <div id="aug-stale"></div>
     <div class="grid" id="aug-grid"></div>
     <div class="status" id="aug-status">載入中…(伺服器若在休眠,喚醒約需 30~60 秒)</div>
@@ -372,6 +375,16 @@
     <div id="patch-stale"></div>
     <div id="patch-content"></div>
     <div class="status" id="patch-status">切到此分頁時載入…</div>
+  </section>
+
+  <!-- 機制 -->
+  <section id="page-mech" hidden>
+    <div class="toolbar">
+      <div class="chips" id="mech-modes"></div>
+      <span class="count" id="mech-count"></span>
+    </div>
+    <div id="mech-content"></div>
+    <div class="status" id="mech-status">切到此分頁時載入…</div>
   </section>
 
   <!-- ARAM -->
@@ -410,7 +423,7 @@ const TIERS = [
 const state = { augs: null, aram: null, arena: null, patch: null, tier: "all", augQ: "", aramQ: "", arenaQ: "", patchQ: "", sortKey: null, sortDir: -1 };
 
 /* ---------------- 分頁切換 ---------------- */
-const TABS = ["aug", "arena", "patch", "aram"];
+const TABS = ["aug", "arena", "aram", "patch", "mech"];
 function showTab(which) {
   for (const t of TABS) {
     $("page-" + t).hidden = t !== which;
@@ -419,6 +432,7 @@ function showTab(which) {
   if (which === "aram" && !state.aram) loadAram();
   if (which === "arena" && !state.arena) loadArena();
   if (which === "patch" && !state.patch) loadPatch("latest");
+  if (which === "mech" && !state.mech) loadMech();
 }
 for (const t of TABS) $("tab-" + t).onclick = () => showTab(t);
 
@@ -428,10 +442,11 @@ function setLang(l) {
   state.lang = l;
   $("lang-zh").classList.toggle("active", l === "zh");
   $("lang-en").classList.toggle("active", l === "en");
-  if (state.augs) { renderChips(); renderAugs(); }
+  if (state.augs) { renderAugModes(); renderChips(); renderAugs(); }
   if (state.arena) renderArena();
   if (state.patch) renderPatch();
   if (state.aram) renderAram();
+  if (state.mech) renderMech();
 }
 $("lang-zh").onclick = () => setLang("zh");
 $("lang-en").onclick = () => setLang("en");
@@ -529,15 +544,46 @@ async function loadAugments() {
     $("meta").innerHTML = `patch <span class="patch">${state.augs.patch}</span> · 資料更新 ${state.augs.fetched_at} · ${state.augs.augments.length} 個強化`;
     if (state.augs.stale) $("aug-stale").innerHTML = '<div class="stale">⚠️ 資料源更新失敗,顯示的是上次成功抓取的快取,可能過期。</div>';
     $("aug-status").hidden = true;
-    renderChips(); renderAugs();
+    renderAugModes(); renderChips(); renderAugs();
   } catch (e) {
     $("aug-status").textContent = "載入失敗:" + e.message + "(重新整理再試一次)";
   }
 }
+/* 圖鑑模式:競技場(cdragon 官方雙語)/ ARAM Mayhem(名稱台服、說明英文 wiki) */
+state.augMode = "arena";
+function currentAugList() {
+  return state.augMode === "mayhem"
+    ? (state.maug ? state.maug.augments : [])
+    : (state.augs ? state.augs.augments : []);
+}
+function renderAugModes() {
+  const zh = state.lang === "zh";
+  const modes = [["arena", "競技場", "Arena"], ["mayhem", "ARAM Mayhem", "Mayhem"]];
+  $("aug-modes").innerHTML = modes.map(([m, lzh, len]) =>
+    `<button class="chip ${state.augMode === m ? "active" : ""}" data-m="${m}">${zh ? lzh : len}</button>`).join("");
+  for (const b of $("aug-modes").children)
+    b.onclick = async () => {
+      state.augMode = b.dataset.m;
+      if (state.augMode === "mayhem" && !state.maug) await loadMayhemAugs();
+      renderAugModes(); renderChips(); renderAugs();
+    };
+}
+async function loadMayhemAugs() {
+  try {
+    const r = await fetch("/api/mayhem-augments");
+    if (!r.ok) throw new Error((await r.json()).error || r.status);
+    state.maug = await r.json();
+  } catch (e) {
+    $("aug-status").hidden = false;
+    $("aug-status").textContent = "Mayhem 圖鑑載入失敗:" + e.message;
+  }
+}
 function renderChips() {
-  const counts = { all: state.augs.augments.length };
-  for (const a of state.augs.augments) counts[a.tier] = (counts[a.tier] || 0) + 1;
-  $("aug-chips").innerHTML = TIERS.map(([slug, zh]) =>
+  const list = currentAugList();
+  const counts = { all: list.length };
+  for (const a of list) counts[a.tier] = (counts[a.tier] || 0) + 1;
+  const tiers = TIERS.filter(([slug]) => slug === "all" || counts[slug]);
+  $("aug-chips").innerHTML = tiers.map(([slug, zh]) =>
     `<button class="chip ${state.tier === slug ? "active" : ""}" data-t="${slug}">${zh} ${counts[slug] || 0}</button>`).join("");
   for (const b of $("aug-chips").children)
     b.onclick = () => { state.tier = b.dataset.t; renderChips(); renderAugs(); };
@@ -545,20 +591,27 @@ function renderChips() {
 const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 function renderAugs() {
   const q = state.augQ.trim().toLowerCase();
-  const list = state.augs.augments.filter((a) =>
+  const mayhem = state.augMode === "mayhem";
+  const list = currentAugList().filter((a) =>
     (state.tier === "all" || a.tier === state.tier) &&
-    (!q || (a.nameZh + a.nameEn + a.descZh + a.descEn).toLowerCase().includes(q)));
+    (!q || (a.nameZh + a.nameEn + (a.descZh || a.desc || "") + (a.descEn || "")).toLowerCase().includes(q)));
   $("aug-count").textContent = `顯示 ${list.length} 個`;
+  $("aug-note").innerHTML = mayhem && state.maug
+    ? `<div class="stale">${esc(state.maug.note)}</div>` : "";
   const zh = state.lang === "zh";
-  $("aug-grid").innerHTML = list.map((a) => `
+  $("aug-grid").innerHTML = list.map((a) => {
+    const descZh = a.descZh !== undefined ? a.descZh : a.desc;
+    const descEn = a.descEn !== undefined ? a.descEn : a.desc;
+    return `
     <div class="card ${a.tier}">
       ${a.icon ? `<img src="${a.icon}" alt="" loading="lazy">` : ""}
       <div class="body">
         <h3>${esc(zh ? a.nameZh : a.nameEn)}<span class="badge ${a.tier}">${esc(zh ? a.tierZh : a.tier)}</span>${a.maxLevel > 1 ? `<span class="badge star">★${a.maxLevel}</span>` : ""}</h3>
         <div class="en">${esc(zh ? a.nameEn : a.nameZh)}</div>
-        <div class="desc">${esc(zh ? a.descZh : a.descEn)}</div>
+        <div class="desc">${richText(zh ? descZh : descEn)}</div>
       </div>
-    </div>`).join("");
+    </div>`;
+  }).join("");
 }
 $("aug-q").oninput = (e) => { state.augQ = e.target.value; renderAugs(); };
 
@@ -706,6 +759,50 @@ function renderPatch() {
 }
 $("patch-ver").onchange = (e) => loadPatch(e.target.value);
 $("patch-q").oninput = (e) => { state.patchQ = e.target.value; renderPatch(); };
+
+/* ---------------- 模式機制 ---------------- */
+state.mechMode = "arena";
+async function loadMech() {
+  try {
+    const r = await fetch("/api/mechanics");
+    if (!r.ok) throw new Error(r.status);
+    state.mech = await r.json();
+    $("mech-status").hidden = true;
+    renderMech();
+  } catch (e) {
+    $("mech-status").textContent = "載入失敗:" + e.message;
+  }
+}
+const MECH_PHASE = { 0: "任一輪", 1: "第一輪投票", 2: "第二輪投票" };
+function renderMech() {
+  const modes = [["arena", "競技場"], ["aram", "ARAM"], ["mayhem", "ARAM Mayhem"]];
+  $("mech-modes").innerHTML = modes.map(([m, label]) =>
+    `<button class="chip ${state.mechMode === m ? "active" : ""}" data-m="${m}">${label}</button>`).join("");
+  for (const b of $("mech-modes").children)
+    b.onclick = () => { state.mechMode = b.dataset.m; renderMech(); };
+  const md = state.mech[state.mechMode];
+  if (!md) { $("mech-content").innerHTML = ""; return; }
+  $("mech-count").textContent = md.name_zh;
+  const html = md.sections.map((sec) => {
+    let inner = "";
+    if (sec.lines && sec.lines.length)
+      inner += `<div class="acard pentry"><ul>${sec.lines.map((l) => `<li>${richText(l)}</li>`).join("")}</ul></div>`;
+    if (sec.guests)
+      inner += `<div class="agrid" style="margin-top:10px">` + sec.guests.map((g) => `
+        <div class="acard">
+          <div class="ahead">
+            ${g.icon ? `<img src="${g.icon}" alt="" loading="lazy">` : ""}
+            <div><h3>${esc(g.nameZh || g.nameEn)}<span class="en">${esc(g.nameEn)}</span></h3>
+            <div class="title">${MECH_PHASE[g.phase] || ""}</div></div>
+          </div>
+          <div style="color:var(--desc);font-size:13px">${esc(g.effect)}</div>
+        </div>`).join("") + `</div>`;
+    return `<div class="pcat">${esc(sec.topic)}</div>` + inner;
+  }).join("");
+  const meta = state.mech._meta || {};
+  $("mech-content").innerHTML = html +
+    `<p style="color:var(--muted);font-size:12.5px;margin-top:16px">資料來源:${esc(meta.sources || "")} · 整理於 ${esc(meta.last_reviewed || "")}</p>`;
+}
 
 /* ---------------- ARAM 平衡表 ---------------- */
 async function loadAram() {

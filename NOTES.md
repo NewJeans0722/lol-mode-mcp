@@ -34,7 +34,7 @@
      解析/分組/tool 在 `arena_balance.py`。
    - 成品:tool `arena_balance(champion)` + 網頁「⚔️ 競技場平衡」分頁
      (`/api/arena-balance`)。
-2. **投票機制 =「Vote Phase / Guests of Honor(貴賓)」— 資料在 Arena 主頁**
+2. ✅ **投票機制(2026-07-11 完成,見日誌:mode_mechanics)**
    - wiki 頁 `Arena`(11 萬字)有完整章節:Fame system、Champion select、
      Battlefields、Round structure、Shop/Combat/Vote Phase、
      Mode-Specific Changes、Patch History。
@@ -181,8 +181,7 @@ src/lol_mode_mcp/
 
 ## 待辦與待決事項
 
-1. **(要你動手)** `src/lol_mode_mcp/data/mode_mechanics.json` 裡的
-   TODO 段落需要你手工校訂(深淵光環數值、競技場規則細節)。
+1. ✅ ~~mode_mechanics.json TODO 校訂~~(2026-07-11 全檔重寫,無 TODO)。
 2. **(要你動手)** 裝 Claude Desktop 後,把 README「本機開發」段的
    json 貼進 `claude_desktop_config.json` 實測。
 3. Phase 3 部署時:README 的 `<部署後的公開網址>` 佔位、截圖、
@@ -192,6 +191,30 @@ src/lol_mode_mcp/
 
 ## 日誌
 
+- **2026-07-11**(機制功能 + Mayhem 圖鑑 + 選單重排):
+  - **偵察結論(重要,別再查)**:強化的英雄限定名單與出現機率
+    **不存在於任何公開來源**——官網 notes、wiki 三頁、cdragon
+    (arena json/cherry-augments 無相關欄位)、客戶端
+    `gameplay.augmentselection.bin.json`(只是 UI/粒子特效,
+    "probability" 是特效參數)都查過;邏輯在 Riot 伺服器端。
+    但**裝備有職業池明文**:職業傳說鐵砧只開該職業池(法帽=法師池),
+    池子清單在 wiki —— 使用者問「純物理鬥士抽不到法帽」的答案。
+  - **mode_mechanics.json 全檔重寫**(原 TODO 骨架淘汰):arena
+    (選取規則/回合表/職業鐵砧/23 位貴賓含效果/誠實聲明)、
+    aram(基本規則/光環補正)、mayhem(MXP 進度/Golden Reroll/
+    專屬內容:終末戰戟、殞落之祭、破曉綻放之劍)。內容為自撰中文
+    事實摘要。新 tool `mode_mechanics(mode)`(mechanics.py)+
+    `/api/mechanics`(貴賓補台服名與頭像)+ 網站「機制」分頁。
+  - **Mayhem 海克斯圖鑑**(mayhem_augments.py):說明文字源 =
+    wiki `Module:MayhemAugmentData/data`(106KB、220 條,tab 縮排,
+    英文 wikitext 用既有清理器);名稱/圖示 = cherry-augments
+    (218/220 對上,_name_key 正規化)。cdragon 沒有含說明的
+    Mayhem 檔(kiwi-hub.json 是空的,已查)。`/api/mayhem-augments`;
+    圖鑑分頁加「競技場/ARAM Mayhem」模式 chips。
+    ⚠️ Mayhem 說明官方無中文,顯示英文並在 UI 註明。
+  - **選單重排**:海克斯圖鑑 / 競技場平衡 / ARAM 平衡 / Patch 改動 / 機制。
+  - 驗收:111 tests;本機 e2e(tool 三 mode、兩個新 API、node 渲染
+    226+220 卡、機制 5 節)全過。
 - **2026-07-11**(側邊主角背景 + README 分家):
   - 背景改「右側主角展示」:#bg 改為右側固定欄(min(48vw,920px)),
     用 CSS mask 往左淡出到內容底下,人物(原畫主體通常在圖中央)

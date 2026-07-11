@@ -14,13 +14,14 @@ LoL「模式限定」資料的 MCP server + 查詢網站 —— 競技場(Arena)
 | tool | `patch_notes(scope, patch, query, locale)` | 逐 patch 改動清單(舊值 ⇒ 新值);scope 可選競技場/一般對戰/ARAM Mayhem,query 可用中文名 |
 | tool | `aram_balance(champion)` | 英雄本 patch 的 ARAM 平衡數值,標明增益/削弱 |
 | tool | `mayhem_balance(champion)` | ARAM: Mayhem 數值(延伸功能,暫未支援) |
-| resource | `lol-mode://mode-mechanics` | 手工校訂的模式機制說明(深淵光環、競技場規則) |
+| tool | `mode_mechanics(mode)` | 模式機制說明:強化選取規則、回合表、貴賓投票、Mayhem 進度(含「機率/英雄限定名單官方未公開」的誠實聲明) |
+| resource | `lol-mode://mode-mechanics` | 同上機制說明的 JSON 原文 |
 
 改動說明的中文採**規則式翻譯**(固定句型 + 台服術語對照表),沒把握的句子保留英文並標 🔤 —— 寧可給原文也不亂翻。
 
 ## 查詢網站(給人看的)
 
-<https://lol-mode-mcp.onrender.com/> —— 四個分頁:海克斯圖鑑(稀有度篩選)、競技場平衡、Patch 改動(範圍/版本切換)、ARAM 平衡表(可排序)。支援中/EN 切換、深色/淺色主題、角色定位篩選(官方職業圖示)、中文名搜尋。
+<https://lol-mode-mcp.onrender.com/> —— 五個分頁:海克斯圖鑑(競技場/ARAM Mayhem 雙圖鑑、稀有度篩選)、競技場平衡、ARAM 平衡表(可排序)、Patch 改動(範圍/版本切換)、模式機制。支援中/EN 切換、深色/淺色主題、角色定位篩選(官方職業圖示)、原畫背景、中文名搜尋。
 
 ## 朋友使用方式(不用安裝任何東西)
 

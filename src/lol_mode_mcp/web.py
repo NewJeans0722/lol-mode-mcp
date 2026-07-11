@@ -250,6 +250,50 @@ async def api_aram(request: Request) -> Response:
     return _cached_json(request, "api_aram", _aram_payload)
 
 
+def _mayhem_augments_payload() -> dict:
+    from .mayhem_augments import TIER_INFO, get_mayhem_codex
+    result = get_mayhem_codex()
+    return {
+        "fetched_at": result.fetched_at_str,
+        "stale": result.is_stale,
+        "note": "說明文字取自英文 wiki(官方未提供 Mayhem 強化的中文說明);名稱為台服官方譯名。",
+        "augments": [
+            {
+                "nameEn": e["nameEn"],
+                "nameZh": e["nameZh"] or e["nameEn"],
+                "tier": e["tier"] or "unknown",
+                "tierZh": TIER_INFO.get(e["tier"], "未知"),
+                "desc": e["desc"],
+                "icon": e["icon"] or "",
+            }
+            for e in result.data
+        ],
+    }
+
+
+async def api_mayhem_augments(request: Request) -> Response:
+    return _cached_json(request, "api_mayhem_augments", _mayhem_augments_payload)
+
+
+def _mechanics_payload() -> dict:
+    from .mechanics import load_mechanics
+    data = load_mechanics()
+    try:  # 貴賓補台服名與頭像
+        champs = {c.name_en: c for c in get_champions().data}
+    except cache.DataUnavailableError:
+        champs = {}
+    for sec in data.get("arena", {}).get("sections", []):
+        for g in sec.get("guests", []):
+            c = champs.get(g["nameEn"])
+            g["nameZh"] = c.name_zh if c else g["nameEn"]
+            g["icon"] = c.icon_url if c else ""
+    return data
+
+
+async def api_mechanics(request: Request) -> Response:
+    return _cached_json(request, "api_mechanics", _mechanics_payload)
+
+
 # ------------------------------------------------------- 背景原畫(官方)
 # 使用者指定的背景英雄;原畫來自 Riot 官方 Data Dragon CDN(和英雄頭像
 # 同一來源)。炫彩(如「泳池狂歡 柔依(焰紅)」)沒有獨立原畫(HEAD 403),
@@ -302,7 +346,9 @@ def warmup() -> None:
                  lambda: _patch_notes_payload("latest", "general")),
                 ("api_patch_latest_mayhem",
                  lambda: _patch_notes_payload("latest", "mayhem")),
-                ("api_backgrounds", _backgrounds_payload)]
+                ("api_backgrounds", _backgrounds_payload),
+                ("api_mayhem_augments", _mayhem_augments_payload),
+                ("api_mechanics", _mechanics_payload)]
     for key, builder in builders:
         try:
             cache.get_cached(key, builder)

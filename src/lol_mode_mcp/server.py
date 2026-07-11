@@ -27,6 +27,7 @@ from mcp.server.transport_security import TransportSecuritySettings
 from .aram import do_aram_balance, do_mayhem_balance
 from .arena import do_get_augment, do_list_augments
 from .arena_balance import do_arena_balance
+from .mechanics import do_mode_mechanics
 from .patch_notes import do_patch_notes
 
 # logging 一律走 stderr:stdio transport 下 stdout 是 MCP 協定通道,
@@ -134,6 +135,20 @@ def patch_notes(scope: str = "arena", patch: str = "latest", query: str = "",
 
 
 @mcp.tool()
+def mode_mechanics(mode: str = "arena") -> str:
+    """查詢模式機制說明:強化選取規則、回合獎勵表、貴賓投票、Mayhem 進度等。
+
+    手工整理的中文摘要。注意:強化的英雄限定名單與出現機率
+    在 Riot 伺服器端、官方未公開,回覆內含誠實聲明。
+
+    Args:
+        mode: "arena"(競技場,預設)/ "aram" / "mayhem"。中文別名也可以。
+    """
+    logger.info("tool mode_mechanics(mode=%r)", mode)
+    return do_mode_mechanics(mode)
+
+
+@mcp.tool()
 def mayhem_balance(champion: str) -> str:
     """查詢英雄在 ARAM: Mayhem 模式的平衡數值(延伸功能,暫未支援)。
 
@@ -175,7 +190,8 @@ def mode_mechanics() -> str:
 # 同一個 HTTP server 順便掛查詢網頁(給人用)與 JSON API(給網頁的 JS 用);
 # MCP 客戶端仍走 /mcp,互不干擾。stdio 模式下這些路由不存在。
 from .web import (api_aram, api_arena_balance, api_augments,  # noqa: E402
-                  api_backgrounds, api_patch_notes, home)
+                  api_backgrounds, api_mayhem_augments, api_mechanics,
+                  api_patch_notes, home)
 
 mcp.custom_route("/", methods=["GET"])(home)
 mcp.custom_route("/api/augments", methods=["GET"])(api_augments)
@@ -183,6 +199,8 @@ mcp.custom_route("/api/aram", methods=["GET"])(api_aram)
 mcp.custom_route("/api/arena-balance", methods=["GET"])(api_arena_balance)
 mcp.custom_route("/api/patch-notes", methods=["GET"])(api_patch_notes)
 mcp.custom_route("/api/backgrounds", methods=["GET"])(api_backgrounds)
+mcp.custom_route("/api/mayhem-augments", methods=["GET"])(api_mayhem_augments)
+mcp.custom_route("/api/mechanics", methods=["GET"])(api_mechanics)
 
 
 def main() -> None:
