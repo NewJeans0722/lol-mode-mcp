@@ -204,6 +204,20 @@ def format_augment_detail(aug: Augment, locale: str) -> str:
     return "\n".join(lines)
 
 
+def _mayhem_twin_hint(aug: Augment) -> str:
+    """競技場強化若在 ARAM Mayhem 也有同名版本,提示模式差異。"""
+    try:
+        from .mayhem_augments import get_mayhem_codex  # 延遲匯入避免循環
+        twin = next((e for e in get_mayhem_codex().data
+                     if _norm(e["nameEn"]) == _norm(aug.name_en)), None)
+        if twin:
+            return ("提示:ARAM Mayhem 也有同名強化,數值/效果可能不同"
+                    "(用 mode=\"mayhem\" 查)。")
+    except cache.DataUnavailableError:
+        pass
+    return ""
+
+
 def do_get_augment(query: str, locale: str = "zh_tw") -> str:
     locale = locale.lower()
     if locale not in SUPPORTED_LOCALES:
@@ -229,6 +243,9 @@ def do_get_augment(query: str, locale: str = "zh_tw") -> str:
         if runners:
             names = "、".join(f"{a.name(locale)}({a.name_en})" for a in runners)
             out.append(f"\n🔎 其他可能符合:{names}(想看哪個再告訴我)")
+        hint = _mayhem_twin_hint(best)
+        if hint:
+            out.append("\n" + hint)
         out.append("")
         out.append(_source_line(result, data.patch, locale))
         return "\n".join(out)

@@ -8,8 +8,8 @@ LoL「模式限定」資料的 MCP server + 查詢網站 —— 競技場(Arena)
 
 | 類型 | 名稱 | 說明 |
 |---|---|---|
-| tool | `get_augment(query, locale)` | 模糊搜尋競技場海克斯強化(中英文名或關鍵字),回傳稀有度與完整效果 |
-| tool | `list_augments(tier, locale)` | 依稀有度(白銀/黃金/稜彩/特殊)列出強化清單 |
+| tool | `get_augment(query, locale, mode)` | 模糊搜尋海克斯強化(競技場/ARAM Mayhem 兩套分開查,同名互相提示) |
+| tool | `list_augments(tier, locale, mode)` | 依稀有度列出強化清單(mode 選競技場或 ARAM Mayhem) |
 | tool | `arena_balance(champion, locale)` | 英雄本 patch 的競技場專屬平衡:基礎數值加成 + 逐技能改動(技能用台服名) |
 | tool | `patch_notes(scope, patch, query, locale)` | 逐 patch 改動清單(舊值 ⇒ 新值);scope 可選競技場/一般對戰/ARAM Mayhem,query 可用中文名 |
 | tool | `aram_balance(champion)` | 英雄本 patch 的 ARAM 平衡數值,標明增益/削弱 |

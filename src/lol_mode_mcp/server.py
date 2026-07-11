@@ -25,7 +25,8 @@ from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
 
 from .aram import do_aram_balance
-from .mayhem_augments import do_mayhem_balance
+from .mayhem_augments import (do_get_mayhem_augment, do_list_mayhem_augments,
+                              do_mayhem_balance)
 from .arena import do_get_augment, do_list_augments
 from .arena_balance import do_arena_balance
 from .mechanics import do_mode_mechanics
@@ -59,28 +60,43 @@ mcp = FastMCP(
 )
 
 
+_MAYHEM_MODES = ("mayhem", "aram", "aram_mayhem", "大混戰", "kiwi")
+
+
 @mcp.tool()
-def get_augment(query: str, locale: str = "zh_tw") -> str:
-    """模糊搜尋競技場(Arena)海克斯強化,回傳名稱、稀有度與完整效果說明。
+def get_augment(query: str, locale: str = "zh_tw", mode: str = "arena") -> str:
+    """模糊搜尋海克斯強化,回傳名稱、稀有度與完整效果說明。
+
+    競技場與 ARAM Mayhem 是兩套不同的強化(同名者數值/效果可能不同),
+    用 mode 區分;查到同名時會提示另一模式也有。
 
     Args:
         query: 強化名稱或關鍵字,中英文皆可(例:「地獄三頭犬」、"Cerberus"、「灼燒」)。
         locale: 回覆語言,"zh_tw"(預設)或 "en_us"。
+        mode: "arena"(競技場,預設)或 "mayhem"(ARAM Mayhem)。
     """
-    logger.info("tool get_augment(query=%r, locale=%r)", query, locale)
+    logger.info("tool get_augment(query=%r, locale=%r, mode=%r)",
+                query, locale, mode)
+    if mode.strip().lower() in _MAYHEM_MODES:
+        return do_get_mayhem_augment(query, locale)
     return do_get_augment(query, locale)
 
 
 @mcp.tool()
-def list_augments(tier: str = "all", locale: str = "zh_tw") -> str:
-    """依稀有度列出競技場海克斯強化清單(名稱 + 一句效果摘要)。
+def list_augments(tier: str = "all", locale: str = "zh_tw",
+                  mode: str = "arena") -> str:
+    """依稀有度列出海克斯強化清單(名稱 + 一句效果摘要)。
 
     Args:
         tier: "all"(預設)/ "silver" 白銀 / "gold" 黃金 / "prismatic" 稜彩
-              / "special" 特殊(稜彩道具、鐵砧類)。中文別名也可以。
+              / "special" 特殊(僅競技場有)。中文別名也可以。
         locale: 回覆語言,"zh_tw"(預設)或 "en_us"。
+        mode: "arena"(競技場,預設)或 "mayhem"(ARAM Mayhem)。
     """
-    logger.info("tool list_augments(tier=%r, locale=%r)", tier, locale)
+    logger.info("tool list_augments(tier=%r, locale=%r, mode=%r)",
+                tier, locale, mode)
+    if mode.strip().lower() in _MAYHEM_MODES:
+        return do_list_mayhem_augments(tier, locale)
     return do_list_augments(tier, locale)
 
 

@@ -40,9 +40,13 @@ def parse_mayhem_module(lua_text: str) -> list[dict]:
         fields = {k: v for k, v in _FIELD_RE.findall(body)}
         desc = fields.get("description", "")
         desc = desc.replace('\\"', '"').replace("\\n", "\n")
+        desc = clean_wikitext(desc)
+        # clean_wikitext 只處理模板/連結,HTML 標籤在這裡清
+        desc = re.sub(r"<br\s*/?>", "\n", desc, flags=re.I)
+        desc = re.sub(r"</?[a-zA-Z][^>]*>", "", desc)
         out.append({
             "nameEn": name,
-            "desc": clean_wikitext(desc),
+            "desc": desc.strip(),
             "tier": fields.get("tier", "").lower(),
         })
     return out
@@ -97,6 +101,123 @@ def _fetch_mayhem_codex() -> list[dict]:
 
 def get_mayhem_codex() -> cache.CacheResult:
     return cache.get_cached("mayhem_codex", _fetch_mayhem_codex)
+
+
+# ------------------------------------------------- 圖鑑搜尋(tool 用)
+# 與 arena.py 的評分策略一致:同名 100 > 名字包含 90/80 > 說明命中 40
+# > difflib。Mayhem 說明只有英文(wiki),輸出會註明。
+
+TIER_LABEL = {"silver": ("⚪", "白銀", "Silver"),
+              "gold": ("🟡", "黃金", "Gold"),
+              "prismatic": ("🌈", "稜彩", "Prismatic")}
+
+
+def score_entry(query: str, e: dict) -> float:
+    from difflib import SequenceMatcher
+
+    from .arena import _norm
+    q = _norm(query)
+    if not q:
+        return 0.0
+    names = [_norm(e.get("nameZh") or ""), _norm(e["nameEn"])]
+    if q in names:
+        return 100.0
+    if any(q in n for n in names if n):
+        return 90.0
+    if any(n in q for n in names if len(n) >= 2):
+        return 80.0
+    desc_hit = q in _norm(e["desc"])
+    fuzz = max(SequenceMatcher(None, q, n).ratio() for n in names if n)
+    return max(40.0 if desc_hit else 0.0, fuzz * 75.0)
+
+
+def format_mayhem_detail(e: dict, locale: str) -> str:
+    icon, zh, en_label = TIER_LABEL.get(e["tier"], ("", "未知", "Unknown"))
+    name_zh = e.get("nameZh") or e["nameEn"]
+    if locale == "zh_tw":
+        head = f"{icon} {zh} Mayhem 強化:{name_zh}({e['nameEn']})"
+        note = "(說明取自英文 wiki;官方未提供 Mayhem 強化的中文說明)"
+    else:
+        head = f"{icon} {en_label} Mayhem Augment: {e['nameEn']}"
+        note = ""
+    lines = [head, "─" * 30, e["desc"] or "(無說明文字)"]
+    if note:
+        lines.append(note)
+    return "\n".join(lines)
+
+
+def _mayhem_source(result: cache.CacheResult, locale: str) -> str:
+    stale = ""
+    if result.is_stale:
+        stale = "\n⚠️ 注意:資料更新失敗,以下為快取,可能過期。"
+    return (f"資料來源:LoL Wiki(CC BY-SA)+ CommunityDragon · 抓取於 "
+            f"{result.fetched_at_str}{stale}")
+
+
+def do_get_mayhem_augment(query: str, locale: str = "zh_tw") -> str:
+    try:
+        result = get_mayhem_codex()
+    except cache.DataUnavailableError as exc:
+        return f"❌ 查詢失敗:無法取得 Mayhem 強化資料。技術細節:{exc}"
+    scored = sorted(((score_entry(query, e), e) for e in result.data),
+                    key=lambda t: -t[0])
+    matches = [(s, e) for s, e in scored[:5] if s > 0]
+    if not matches:
+        return f"找不到與「{query}」相關的 ARAM Mayhem 強化。"
+    best_s, best = matches[0]
+    lines = []
+    if best_s < 80:
+        lines.append(f"沒有完全符合「{query}」的 Mayhem 強化,最接近的是:")
+        lines.append("")
+    lines.append(format_mayhem_detail(best, locale))
+    others = [(s, e) for s, e in matches[1:] if s >= 40]
+    if others:
+        lines += ["", "其他候選:"]
+        for _, e in others:
+            lines.append(f"- {e.get('nameZh') or e['nameEn']}({e['nameEn']})")
+    # 競技場若有同名強化,提示模式差異
+    try:
+        from .arena import _norm, get_arena_data
+        twin = next((a for a in get_arena_data().data.augments
+                     if _norm(a.name_en) == _norm(best["nameEn"])), None)
+        if twin:
+            lines += ["", f"提示:競技場也有「{twin.name_zh}」,數值/效果可能不同"
+                          "(用 mode=\"arena\" 查)。"]
+    except cache.DataUnavailableError:
+        pass
+    lines += ["", _mayhem_source(result, locale)]
+    return "\n".join(lines)
+
+
+def do_list_mayhem_augments(tier: str = "all", locale: str = "zh_tw") -> str:
+    from .arena import _TIER_ALIASES
+    from .formatting import first_sentence
+    try:
+        result = get_mayhem_codex()
+    except cache.DataUnavailableError as exc:
+        return f"❌ 查詢失敗:無法取得 Mayhem 強化資料。技術細節:{exc}"
+    slug_by_rarity = {0: "silver", 1: "gold", 2: "prismatic"}
+    want = tier.strip().lower()
+    want_slug = None
+    if want not in ("", "all", "全部"):
+        rarity = _TIER_ALIASES.get(want)
+        want_slug = slug_by_rarity.get(rarity, want)
+    lines = ["ARAM Mayhem 海克斯強化清單",
+             "(說明取自英文 wiki;官方未提供中文說明)", ""]
+    for slug in ("silver", "gold", "prismatic"):
+        if want_slug and slug != want_slug:
+            continue
+        group = [e for e in result.data if e["tier"] == slug]
+        if not group:
+            continue
+        icon, zh, _ = TIER_LABEL[slug]
+        lines.append(f"## {icon} {zh} — {len(group)} 個")
+        for e in sorted(group, key=lambda x: x.get("nameZh") or x["nameEn"]):
+            lines.append(f"- **{e.get('nameZh') or e['nameEn']}**({e['nameEn']})"
+                         f":{first_sentence(e['desc'])}")
+        lines.append("")
+    lines.append(_mayhem_source(result, locale))
+    return "\n".join(lines)
 
 
 # ------------------------------------------------- 每英雄覆寫(mayhem_balance)
