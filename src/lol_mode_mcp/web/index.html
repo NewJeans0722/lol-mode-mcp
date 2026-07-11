@@ -64,17 +64,34 @@
     opacity: .04;
   }
   body.light::before { opacity: .07; }
-  /* 官方原畫背景(可在右上選單切換) */
+  /* 官方原畫背景:右側「主角展示」——原畫主體(通常在圖中央)
+     落在右側邊欄,往左淡出到內容區底下,人物不會被內容擋住 */
   #bg {
-    position: fixed; inset: 0; z-index: -3; pointer-events: none;
-    background-size: cover; background-position: center 18%;
+    position: fixed; top: 0; right: 0; bottom: 0; z-index: -3;
+    width: min(48vw, 920px); pointer-events: none;
+    background-size: cover; background-position: center 22%;
+    -webkit-mask-image: linear-gradient(to left, rgba(0,0,0,.95) 42%, transparent 97%);
+    mask-image: linear-gradient(to left, rgba(0,0,0,.95) 42%, transparent 97%);
   }
-  #bg::after {
+  #bg::after {  /* 輕薄遮罩:右側文字(計數等)仍可讀,但不蓋掉人物 */
     content: ""; position: absolute; inset: 0;
-    background: linear-gradient(180deg, rgba(10,14,20,.78) 0%, rgba(10,14,20,.9) 55%, rgba(10,14,20,.96) 100%);
+    background: linear-gradient(180deg, rgba(10,14,20,.35) 0%, rgba(10,14,20,.2) 40%, rgba(10,14,20,.55) 100%);
   }
   body.light #bg::after {
-    background: linear-gradient(180deg, rgba(243,241,234,.86) 0%, rgba(243,241,234,.94) 55%, rgba(243,241,234,.97) 100%);
+    background: linear-gradient(180deg, rgba(243,241,234,.45) 0%, rgba(243,241,234,.3) 40%, rgba(243,241,234,.6) 100%);
+  }
+  /* 窄螢幕:側欄放不下,退回全幅淡化背景 */
+  @media (max-width: 1100px) {
+    #bg {
+      width: 100vw;
+      -webkit-mask-image: none; mask-image: none;
+    }
+    #bg::after {
+      background: linear-gradient(180deg, rgba(10,14,20,.82) 0%, rgba(10,14,20,.93) 60%, rgba(10,14,20,.97) 100%);
+    }
+    body.light #bg::after {
+      background: linear-gradient(180deg, rgba(243,241,234,.88) 0%, rgba(243,241,234,.95) 60%, rgba(243,241,234,.98) 100%);
+    }
   }
   header {
     padding: 28px 20px 0; max-width: 1180px; margin: 0 auto;

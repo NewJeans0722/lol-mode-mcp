@@ -36,51 +36,9 @@ LoL「模式限定」資料的 MCP server + 查詢網站 —— 競技場(Arena)
 
 4. 儲存後開新對話,直接問:「灼燒煉金那個強化在做什麼」、「悟空的 ARAM 有被削嗎」
 
-## 本機開發
+## 自行架設
 
-需要 [uv](https://docs.astral.sh/uv/) 與 Python 3.10+。
-
-```bash
-uv sync                                 # 安裝依賴
-uv run pytest                           # 跑測試
-uv run mcp dev src/lol_mode_mcp/server.py   # MCP Inspector 互動測試
-uv run lol-mode-mcp                     # 直接啟動(stdio)
-```
-
-接上自己的 Claude Desktop(`claude_desktop_config.json`):
-
-```json
-{
-  "mcpServers": {
-    "lol-mode-mcp": {
-      "command": "uv",
-      "args": ["run", "--directory", "C:/Users/zhong/Desktop/LOL_MCP", "lol-mode-mcp"]
-    }
-  }
-}
-```
-
-## 部署(Render 免費方案)
-
-1. push 到 GitHub([NewJeans0722/lol-mode-mcp](https://github.com/NewJeans0722/lol-mode-mcp))
-2. [Render](https://render.com) → New → Blueprint → 選這個 repo(設定都在 `render.yaml`)
-3. 取得公開網址;之後每次 push 到 main 自動重新部署,朋友端不需任何動作
-
-> 曾嘗試 FastMCP Cloud,但其免費方案的伺服器強制 Horizon 帳號驗證
-> (公開存取要付費),不符合「朋友貼網址就能用」的目標,故改用 Render。
-> repo 根目錄的 `server.py` 是為 FastMCP Cloud 準備的入口,保留備用。
-
-環境變數:
-
-| 變數 | 預設 | 說明 |
-|---|---|---|
-| `MCP_TRANSPORT` | `stdio` | 設 `streamable-http` 走 remote MCP |
-| `FASTMCP_HOST` / `FASTMCP_PORT` | `127.0.0.1` / `8000` | HTTP 模式的監聽位址 |
-| `LOL_MCP_CACHE_TTL` | `43200`(12 小時) | 資料快取秒數 |
-| `LOL_MCP_LOG_LEVEL` | `INFO` | 日誌等級(輸出到 stderr) |
-| `GOATCOUNTER_CODE` | (未設) | 設定後在網頁注入 [GoatCounter](https://www.goatcounter.com/) 流量統計 |
-
-安全性:本專案只提供公開遊戲資料、不碰任何秘密,目前不做驗證。
+用 [uv](https://docs.astral.sh/uv/) + Python 3.10+ 可直接跑(`uv sync && uv run lol-mode-mcp`);雲端部署設定在 `render.yaml`,push 即自動部署。
 
 ## 資料來源與致謝
 
