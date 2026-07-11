@@ -447,16 +447,10 @@ $("theme-btn").onclick = () =>
 try { setTheme(localStorage.getItem("theme") || "dark"); } catch (e) {}
 
 /* ---------------- 背景原畫(官方 splash,左右雙欄) ---------------- */
-// 預設:右 = 柔依經典原畫、左 = 戰爭學院 布蕾爾。
-// 儲存鍵改版(bgRight/bgLeft),舊的 "bg" 鍵作廢 → 所有人拿到新預設一次。
+// 預設:兩側皆「無」,想看原畫自己從選單挑;選過的會記住(bgRight/bgLeft)。
 const BG_SIDES = {
-  right: { el: "bg", sel: "bg-select", store: "bgRight",
-           def: (bgs) => { const c = bgs.find((x) => x.id === "Zoe");
-                           return c ? `Zoe_${c.skins[0].num}` : ""; } },
-  left:  { el: "bg-left", sel: "bg-left-select", store: "bgLeft",
-           def: (bgs) => { const c = bgs.find((x) => x.id === "Briar");
-                           const s = c && c.skins.find((k) => k.name.includes("戰爭學院"));
-                           return s ? `Briar_${s.num}` : ""; } },
+  right: { el: "bg", sel: "bg-select", store: "bgRight", def: () => "" },
+  left:  { el: "bg-left", sel: "bg-left-select", store: "bgLeft", def: () => "" },
 };
 function setBg(side, v) {
   const cfg = BG_SIDES[side];
