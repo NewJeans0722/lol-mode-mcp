@@ -80,8 +80,24 @@
   body.light #bg::after {
     background: linear-gradient(180deg, rgba(243,241,234,.45) 0%, rgba(243,241,234,.3) 40%, rgba(243,241,234,.6) 100%);
   }
-  /* 窄螢幕:側欄放不下,退回全幅淡化背景 */
+  /* 左側展示欄(鏡像) */
+  #bg-left {
+    position: fixed; top: 0; left: 0; bottom: 0; z-index: -3;
+    width: min(48vw, 920px); pointer-events: none;
+    background-size: cover; background-position: center 22%;
+    -webkit-mask-image: linear-gradient(to right, rgba(0,0,0,.95) 42%, transparent 97%);
+    mask-image: linear-gradient(to right, rgba(0,0,0,.95) 42%, transparent 97%);
+  }
+  #bg-left::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(10,14,20,.35) 0%, rgba(10,14,20,.2) 40%, rgba(10,14,20,.55) 100%);
+  }
+  body.light #bg-left::after {
+    background: linear-gradient(180deg, rgba(243,241,234,.45) 0%, rgba(243,241,234,.3) 40%, rgba(243,241,234,.6) 100%);
+  }
+  /* 窄螢幕:側欄放不下,右欄退回全幅淡化背景、左欄隱藏 */
   @media (max-width: 1100px) {
+    #bg-left { display: none; }
     #bg {
       width: 100vw;
       -webkit-mask-image: none; mask-image: none;
@@ -299,6 +315,7 @@
 </head>
 <body>
 <div id="bg"></div>
+<div id="bg-left"></div>
 <header>
   <h1>LoL <span class="gold">模式資料庫</span><span class="byline">by zhongiii</span></h1>
   <p class="sub" id="meta">載入中…</p>
@@ -312,7 +329,8 @@
       <button id="lang-en">EN</button>
       <button id="theme-btn" title="深色/淺色">◐</button>
       <button id="font-btn" title="字體大小">A</button>
-      <select id="bg-select" title="背景原畫"><option value="">背景:無</option></select>
+      <select id="bg-left-select" title="左側背景"><option value="">左景:無</option></select>
+      <select id="bg-select" title="右側背景"><option value="">右景:無</option></select>
     </div>
   </nav>
 </header>
@@ -428,10 +446,22 @@ $("theme-btn").onclick = () =>
   setTheme(document.body.classList.contains("light") ? "dark" : "light");
 try { setTheme(localStorage.getItem("theme") || "dark"); } catch (e) {}
 
-/* ---------------- 背景原畫(官方 splash) ---------------- */
-function setBg(v) {
-  state.bgVal = v || "";
-  $("bg-select").value = state.bgVal;
+/* ---------------- 背景原畫(官方 splash,左右雙欄) ---------------- */
+// 預設:右 = 柔依經典原畫、左 = 戰爭學院 布蕾爾。
+// 儲存鍵改版(bgRight/bgLeft),舊的 "bg" 鍵作廢 → 所有人拿到新預設一次。
+const BG_SIDES = {
+  right: { el: "bg", sel: "bg-select", store: "bgRight",
+           def: (bgs) => { const c = bgs.find((x) => x.id === "Zoe");
+                           return c ? `Zoe_${c.skins[0].num}` : ""; } },
+  left:  { el: "bg-left", sel: "bg-left-select", store: "bgLeft",
+           def: (bgs) => { const c = bgs.find((x) => x.id === "Briar");
+                           const s = c && c.skins.find((k) => k.name.includes("戰爭學院"));
+                           return s ? `Briar_${s.num}` : ""; } },
+};
+function setBg(side, v) {
+  const cfg = BG_SIDES[side];
+  v = v || "";
+  $(cfg.sel).value = v;
   let url = "";
   if (v) {
     const [cid, num] = v.split("_");
@@ -439,29 +469,28 @@ function setBg(v) {
     const s = c && c.skins.find((x) => String(x.num) === num);
     if (s) url = s.url;
   }
-  $("bg").style.backgroundImage = url ? `url("${url}")` : "";
-  try { localStorage.setItem("bg", state.bgVal); } catch (e) {}
+  $(cfg.el).style.backgroundImage = url ? `url("${url}")` : "";
+  try { localStorage.setItem(cfg.store, v); } catch (e) {}
 }
 async function initBg() {
   try {
     const r = await fetch("/api/backgrounds");
     if (!r.ok) return;
     state.bgs = (await r.json()).champions;
-    $("bg-select").innerHTML = '<option value="">背景:無</option>' +
-      state.bgs.map((c) => `<optgroup label="${esc(c.name)}">` +
-        c.skins.map((s) => `<option value="${c.id}_${s.num}">${esc(s.name)}</option>`).join("") +
-        "</optgroup>").join("");
-    let v = null;
-    try { v = localStorage.getItem("bg"); } catch (e) {}
-    if (v === null) {  // 第一次來:預設泳池狂歡 柔依
-      const zoe = state.bgs.find((c) => c.id === "Zoe");
-      const pool = zoe && zoe.skins.find((s) => s.name.includes("泳池"));
-      v = pool ? `Zoe_${pool.num}` : "";
+    const groups = state.bgs.map((c) => `<optgroup label="${esc(c.name)}">` +
+      c.skins.map((s) => `<option value="${c.id}_${s.num}">${esc(s.name)}</option>`).join("") +
+      "</optgroup>").join("");
+    for (const [side, cfg] of Object.entries(BG_SIDES)) {
+      const label = side === "left" ? "左景:無" : "右景:無";
+      $(cfg.sel).innerHTML = `<option value="">${label}</option>` + groups;
+      let v = null;
+      try { v = localStorage.getItem(cfg.store); } catch (e) {}
+      if (v === null) v = cfg.def(state.bgs);
+      setBg(side, v);
+      $(cfg.sel).onchange = (e) => setBg(side, e.target.value);
     }
-    setBg(v);
   } catch (e) {}
 }
-$("bg-select").onchange = (e) => setBg(e.target.value);
 initBg();
 
 /* ---------------- 字體大小 ---------------- */
