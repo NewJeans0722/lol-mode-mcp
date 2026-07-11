@@ -94,6 +94,7 @@ def _augments_payload() -> dict:
                 "descZh": a.desc_zh,
                 "descEn": a.desc_en,
                 "icon": a.icon_url,
+                "maxLevel": a.max_level,
             }
             for a in data.augments
         ],

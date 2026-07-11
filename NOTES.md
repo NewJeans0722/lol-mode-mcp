@@ -113,10 +113,21 @@ src/lol_mode_mcp/
 3. **`desc` vs `tooltip`**:兩者都有 `@變數@` 佔位符,但只有 `desc`
    的佔位符和 `dataValues` 直接對得上(例 APAmp=0.15 → `@APAmp*100@` → 15%);
    `tooltip` 引用遊戲內即時計算值(`@f1@` 等)離線解不出來。
-   **顯示一律用 `desc`**,解不出的佔位符標「?」並附說明。
-4. **`dataValues` 是長度 7 的陣列**,部分強化可升級所以各 index 值不同
-   (例:全能之魂 2/3/4/5/6/7 種龍魂)。不猜哪個 index,
-   把相異值依序用「/」串接呈現。7 個 index 的確切語意未查證。
+   **顯示一律用 `desc`**。指向 calculations 公式的佔位符會部分求值
+   (等級內插「100–300(隨等級)」、屬性/層數加成註記,見 formatting.py
+   `_eval_calc`);完全解不出退「(依遊戲內數值)」,不再出現孤立「?」。
+   另有 `@spell.Augment_{apiName}:{Key}@` 跨引用格式(實測都指自己的
+   dataValues),`_SPELL_REF` 處理。
+4. **`dataValues` 索引語意(2026-07-11 已驗證,先前的懸案)**:
+   每 key 長度 7 陣列 + `MaxLevel` 欄位(陣列或**純量**,17 個強化缺
+   =1)。**index 1..MaxLevel = 第 1..N 星數值**,之後是外插垃圾
+   (天界之身 Health=[1000,1000,2000,3000,4000...] ★3 → 1000/2000/3000,
+   4000+ 是垃圾;全能之魂龍魂 2/3/4);index 0 通常≈1星值但不可靠
+   (蜂群意識 StartingBees[0]=0)。分布:1★=79、2★=100、3★=47。
+   例外 4 個(MaxLevel=1 但值遞增=隨遊戲內條件成長,維持整條串接):
+   不朽守衛/火狐 BaseDamage、重創劇毒 DebuffDuration、鐵砧賭博
+   PrismaticCostReduction。顯示規則在 formatting.py `_render_values`,
+   可升級強化文末自動加「(可升級,最高 ★N…)」註記。
 5. **patch 版本**從 `content-metadata.json` 取,原始格式帶 build 資訊,
    修剪成 `16.13` 這種人類可讀格式,附在每個回覆末尾。
 6. **ARAM 數值源**:採 MediaWiki API 抓 `Module:ChampionData/data` 的
@@ -181,6 +192,24 @@ src/lol_mode_mcp/
 
 ## 日誌
 
+- **2026-07-11**(強化說明總整治,使用者抓到的顯示 bug):
+  使用者質疑「天界之身 1000/…/6000 生命,但升星只有三階」→ 完全正確。
+  三類問題一次修(偵察細節在「資料源實測發現 #3/#4」與
+  `~/.claude/plans/shiny-weaving-penguin.md`):
+  - **星級切片**:dataValues 的 MaxLevel 欄位一直都在,index 1..N
+    = 各星級值,之後是垃圾。`_render_values` 依 MaxLevel 切片;
+    Augment 加 max_level;tool 詳情/網頁卡片顯示 ★N(147 個可升級)。
+  - **@spell.Augment_X:Y@**(4 處,飛影跑法/守護家園):實測 X 都是
+    自己的 apiName,`_SPELL_REF` 解回自身 dataValues(peers 備援)。
+  - **「?」→ 部分求值**:`_eval_calc` 處理 NamedDataValue/
+    ByCharLevelInterpolation(→「100–300(隨等級)」)/StatBy*(→
+    「(+隨最大生命加成)」,mStat 對照表只收查證過的 9=暴擊機率、
+    12=最大生命)/SumOfSubParts/BuffCounter/雜湊 range 型別
+    {ee18a47b};解不出退「(依遊戲內數值)」。
+    ⚠️ 佔位符自帶 *100 乘數要優先於公式的 mDisplayAsPercent。
+  - 驗收:108 tests;全量掃描 226 強化 **0 未解佔位符 0 @ 殘留**
+    (「404找不到增幅裝置」英文原文的 ?!?!? 是彩蛋標點,不是殘留)。
+  - 日後 patch 更新複驗法:跑全量掃描腳本(見計畫檔驗證節)。
 - **2026-07-11**(背景原畫切換):右上選單可換柔依/布蕾爾全造型背景
   (官方正名是「柔依」「布蕾爾」,不是柔伊/布雷爾),預設「泳池狂歡
   柔依」。

@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 
 from . import cache
-from .formatting import first_sentence, render_description
+from .formatting import first_sentence, read_max_level, render_description
 from .http_util import fetch_json
 
 logger = logging.getLogger(__name__)
@@ -54,6 +54,7 @@ class Augment:
     desc_zh: str  # 已代入數值、清完標籤的純文字
     desc_en: str
     icon_path: str = ""  # 例:assets/ux/cherry/augments/icons/adapt_large.png
+    max_level: int = 1   # 星級上限(1 = 不可升級;實測最高 3)
 
     @property
     def icon_url(self) -> str:
@@ -105,22 +106,30 @@ def _fetch_arena_data() -> ArenaData:
         patch = "unknown"
 
     zh_by_id = {a["id"]: a for a in zh.get("augments", [])}
+    # @spell.Augment_X:Y@ 跨引用查表(實測 X 都指自己,peers 是保險)
+    peers = {a.get("apiName", "").lower(): a.get("dataValues", {})
+             for a in en.get("augments", [])}
     augments: list[Augment] = []
     for raw_en in en.get("augments", []):
         raw_zh = zh_by_id.get(raw_en["id"], raw_en)
         dv = raw_en.get("dataValues", {})
         calc = raw_en.get("calculations", {})
+        api = raw_en.get("apiName", "")
         augments.append(Augment(
             id=raw_en["id"],
-            api_name=raw_en.get("apiName", ""),
+            api_name=api,
             rarity=raw_en.get("rarity", -1),
             name_en=raw_en.get("name", ""),
             name_zh=raw_zh.get("name", raw_en.get("name", "")),
-            desc_en=render_description(_pick_text(raw_en), dv, calc),
+            desc_en=render_description(_pick_text(raw_en), dv, calc,
+                                       locale="en_us", api_name=api,
+                                       peers=peers),
             desc_zh=render_description(
                 _pick_text(raw_zh), raw_zh.get("dataValues", dv),
-                raw_zh.get("calculations", calc)),
+                raw_zh.get("calculations", calc),
+                locale="zh_tw", api_name=api, peers=peers),
             icon_path=raw_en.get("iconLarge", ""),
+            max_level=read_max_level(dv),
         ))
     logger.info("arena data loaded: %d augments, patch %s", len(augments), patch)
     return ArenaData(augments=augments, patch=patch)
@@ -181,18 +190,17 @@ def _source_line(result: cache.CacheResult, patch: str, locale: str) -> str:
 
 def format_augment_detail(aug: Augment, locale: str) -> str:
     other_name = aug.name_en if locale == "zh_tw" else aug.name_zh
+    star = ""
+    if aug.max_level > 1:
+        star = (f"(可升級,最高 ★{aug.max_level})" if locale == "zh_tw"
+                else f" (upgradable, max ★{aug.max_level})")
     lines = [
-        f"{aug.rarity_label(locale)}強化:{aug.name(locale)}({other_name})"
+        f"{aug.rarity_label(locale)}強化{star}:{aug.name(locale)}({other_name})"
         if locale == "zh_tw" else
-        f"{aug.rarity_label(locale)} Augment: {aug.name(locale)} ({other_name})",
+        f"{aug.rarity_label(locale)} Augment{star}: {aug.name(locale)} ({other_name})",
         "─" * 30,
         aug.desc(locale) or "(此強化沒有說明文字)",
     ]
-    if "?" in aug.desc(locale):
-        lines.append("")
-        lines.append("說明:「?」代表該數值由遊戲內即時計算(隨等級/裝備變動),離線資料無法確定。"
-                     if locale == "zh_tw" else
-                     "Note: '?' marks values computed live in-game; not available offline.")
     return "\n".join(lines)
 
 

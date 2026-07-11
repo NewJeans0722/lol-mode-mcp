@@ -22,7 +22,7 @@ def test_negative_multiplier():
 
 
 def test_case_insensitive_datavalue_lookup():
-    assert render_description("@maxlevel@", {"MaxLevel": [2.0]}) == "2"
+    assert render_description("@healamount@", {"HealAmount": [30.0]}) == "30"
 
 
 def test_calculation_redirect():
@@ -31,8 +31,100 @@ def test_calculation_redirect():
     assert render_description("@APAmpCalcTooltip*100@%", dv, calc) == "20%"
 
 
-def test_unresolvable_placeholder_marked():
-    assert render_description("目前:@f1@", {}) == "目前:?"
+def test_unresolvable_placeholder_gets_readable_text():
+    out = render_description("目前:@f1@", {})
+    assert out == "目前:(依遊戲內數值)"
+    assert render_description("Now: @f1@", {}, locale="en_us") == \
+        "Now: (computed in-game)"
+
+
+# ---------------------------------------------------------- 星級(MaxLevel)
+
+# 仿「天界之身」實際資料:index1..3 = 各星級,之後是外插垃圾
+_CELESTIAL = {
+    "Health": [1000.0, 1000.0, 2000.0, 3000.0, 4000.0, 5000.0, 6000.0],
+    "DamageReduction": [0.1, 0.1, 0.05, 0.0, 0.0, 0.0, 0.0],
+    "MaxLevel": [3.0] * 7,
+}
+
+
+def test_star_levels_slice_out_garbage():
+    out = render_description(
+        "增加@Health@生命,傷害降低@DamageReduction*100@%。", _CELESTIAL)
+    assert "1000/2000/3000" in out and "4000" not in out
+    assert "10/5/0%" in out
+
+
+def test_star_note_appended_and_excluded_from_summary():
+    out = render_description("增加@Health@生命。", _CELESTIAL)
+    assert "★3" in out
+    assert "★" not in first_sentence(out)
+
+
+def test_equal_star_values_collapse_to_single():
+    dv = {"Dmg": [50.0] * 7, "MaxLevel": [2.0] * 7}
+    out = render_description("造成@Dmg@傷害。", dv)
+    assert "造成50傷害。" in out
+
+
+def test_maxlevel_scalar_and_missing_and_scalar_values():
+    # MaxLevel 是純量、dataValues 值是純量:都不能炸
+    assert "7" in render_description("@X@", {"X": 7.0, "MaxLevel": 2})
+    # 缺 MaxLevel = 1 星:維持相異值整條串接(不朽守衛型例外)
+    out = render_description("@Dmg@", {"Dmg": [-25.0, 75.0, 175.0, 275.0]})
+    assert out == "-25/75/175/275"
+
+
+# ------------------------------------------------------ @spell.Augment_X:Y@
+
+def test_spell_ref_resolves_own_datavalues():
+    out = render_description(
+        "增加@spell.Augment_ShadowRunner:MSAmount*100@%跑速,持續@spell.Augment_ShadowRunner:BuffDuration@秒。",
+        {"MSAmount": [0.4], "BuffDuration": [3.0]},
+        api_name="ShadowRunner")
+    assert out == "增加40%跑速,持續3秒。"
+
+
+def test_spell_ref_falls_back_to_peers():
+    out = render_description(
+        "@spell.Augment_Other:Speed@", {}, api_name="Me",
+        peers={"other": {"Speed": [25.0]}})
+    assert out == "25"
+
+
+def test_spell_ref_unknown_gets_readable_text():
+    assert render_description("@spell.Augment_Nobody:X@", {}) == "(依遊戲內數值)"
+
+
+# ------------------------------------------------------- calculations 求值
+
+def test_calc_char_level_interpolation():
+    calc = {"TotalShield": {"mFormulaParts": [
+        {"__type": "ByCharLevelInterpolationCalculationPart",
+         "mStartValue": 100.0, "mEndValue": 300.0},
+        {"__type": "StatByNamedDataValueCalculationPart",
+         "mDataValue": "HealthScalar", "mStat": 12},
+    ]}}
+    out = render_description("獲得@TotalShield@護盾。", {}, calc)
+    assert "100–300(隨等級)" in out and "最大生命" in out
+
+
+def test_calc_sum_with_buff_counter():
+    calc = {"MaxHealthReduction": {"mFormulaParts": [
+        {"__type": "SumOfSubPartsCalculationPart", "mSubparts": [
+            {"__type": "NamedDataValueCalculationPart",
+             "mDataValue": "HealthReductionPercent"},
+            {"__type": "BuffCounterByCoefficientCalculationPart",
+             "mBuffName": "{x}", "mCoefficient": 1.0},
+        ]}]}}
+    out = render_description("@MaxHealthReduction*100@%",
+                             {"HealthReductionPercent": [0.05]}, calc)
+    assert "5" in out and "隨層數成長" in out
+
+
+def test_calc_unknown_type_gets_readable_text():
+    calc = {"Mystery": {"mFormulaParts": [{"__type": "SomethingNew"}]}}
+    assert render_description("@Mystery@", {}, calc) == "(依遊戲內數值)"
 
 
 def test_br_and_tags_stripped():

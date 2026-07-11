@@ -175,6 +175,7 @@
     background: linear-gradient(90deg, rgba(125,227,255,.08), rgba(194,151,255,.08));
   }
   .badge.special { color: var(--special); border-color: var(--special); }
+  .badge.star { color: var(--gold-bright); border-color: var(--gold); }
 
   /* ---- ARAM 表 ---- */
   .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 2px; }
@@ -512,7 +513,7 @@ function renderAugs() {
     <div class="card ${a.tier}">
       ${a.icon ? `<img src="${a.icon}" alt="" loading="lazy">` : ""}
       <div class="body">
-        <h3>${esc(zh ? a.nameZh : a.nameEn)}<span class="badge ${a.tier}">${esc(zh ? a.tierZh : a.tier)}</span></h3>
+        <h3>${esc(zh ? a.nameZh : a.nameEn)}<span class="badge ${a.tier}">${esc(zh ? a.tierZh : a.tier)}</span>${a.maxLevel > 1 ? `<span class="badge star">★${a.maxLevel}</span>` : ""}</h3>
         <div class="en">${esc(zh ? a.nameEn : a.nameZh)}</div>
         <div class="desc">${esc(zh ? a.descZh : a.descEn)}</div>
       </div>
