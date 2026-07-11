@@ -320,7 +320,8 @@ def _mayhem_augments_payload() -> dict:
     return {
         "fetched_at": result.fetched_at_str,
         "stale": result.is_stale,
-        "note": "說明文字取自英文 wiki(官方未提供 Mayhem 強化的中文說明);名稱為台服官方譯名。",
+        "note": "中文說明優先取官方遊戲字串,其餘為規則式翻譯;未完整翻出的"
+                "段落保留英文(標「🔤 原文」),數值以英文 wiki 為準。名稱為台服官方譯名。",
         "augments": [
             {
                 "nameEn": e["nameEn"],
@@ -328,6 +329,8 @@ def _mayhem_augments_payload() -> dict:
                 "tier": e["tier"] or "unknown",
                 "tierZh": TIER_INFO.get(e["tier"], "未知"),
                 "desc": e["desc"],
+                "descZh": e.get("descZh") or e["desc"],
+                "descComplete": e.get("descComplete", False),
                 "icon": e["icon"] or "",
             }
             for e in result.data

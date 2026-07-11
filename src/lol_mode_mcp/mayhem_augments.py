@@ -1,20 +1,29 @@
 """ARAM: Mayhem 強化圖鑑資料。
 
-來源組合(官方沒有含說明的 Mayhem 圖鑑檔,已查證 cdragon 只有
-arena/tft;kiwi-hub.json 是空的):
+來源組合:
 - 名稱/稀有度/圖示:cdragon cherry-augments.json(zh_tw + default,
   官方遊戲字串,ARAM_ 前綴)
-- 說明文字:wiki Module:MayhemAugmentData/data(英文 wikitext,
-  用 wikitext.clean_wikitext 化簡)——官方未提供中文說明文字,
-  故說明保留英文,由 UI 註明。
+- 英文說明:wiki Module:MayhemAugmentData/data(Mayhem 專屬、數值正確,
+  英文 wikitext 用 wikitext.clean_wikitext 化簡)
+- 中文說明(descZh)三層來源,優先序:
+  1. 遊戲字串表 zh_tw 的官方說明(cherry_{name}_summary),僅在「無
+     @佔位符@」時採用 —— 無佔位符=無數值,故 Arena 版說明對 Mayhem
+     也正確,是官方原文最高品質。
+  2. 對英文說明跑規則式翻譯(translate.translate_description)。
+  3. 都不行 → 保留英文,UI/tool 註明。
+  ⚠️ 帶佔位符的官方 zh 需要 Mayhem dataValues(遊戲未提供),硬用
+  Arena 數值可能錯,故不採用;那些走第 2/3 層(英文 wiki 數值正確)。
 """
 
 from __future__ import annotations
 
+import json
 import logging
 import re
+from pathlib import Path
 
 from . import cache
+from .formatting import render_description
 from .http_util import fetch_json
 from .patch_notes import CHERRY_AUG_URL, _name_key
 from .wikitext import clean_wikitext
@@ -25,6 +34,10 @@ WIKI_API = "https://wiki.leagueoflegends.com/en-us/api.php"
 MODULE_TITLE = "Module:MayhemAugmentData/data"
 _ASSET_BASE = ("https://raw.communitydragon.org/latest/plugins/"
                "rcp-be-lol-game-data/global/default")
+_STRINGTABLE_URL = ("https://raw.communitydragon.org/latest/game/zh_tw/"
+                    "data/menu/en_us/lol.stringtable.json")
+_SUMMARY_KEY_RE = re.compile(
+    r"^(?:kiwi_aram_|kiwi_|cherry_)([a-z0-9]+)_summary$")
 
 _ENTRY_RE = re.compile(
     r'\[\"([^\"]+)\"\]\s*=\s*\{(.*?)\n\t?\},', re.S)
@@ -52,6 +65,21 @@ def parse_mayhem_module(lua_text: str) -> list[dict]:
     return out
 
 
+_CURATED_PATH = Path(__file__).resolve().parent / "data" / "mayhem_zh.json"
+_curated: dict[str, str] | None = None
+
+
+def _load_curated() -> dict[str, str]:
+    """人工整段中文翻譯,以英文強化名為 key(穩定,不受 wiki 改字影響)。"""
+    global _curated
+    if _curated is None:
+        try:
+            _curated = json.loads(_CURATED_PATH.read_text(encoding="utf-8"))
+        except OSError:
+            _curated = {}
+    return _curated
+
+
 def _icon_url(path: str) -> str:
     prefix = "/lol-game-data/assets/"
     if path.lower().startswith(prefix):
@@ -70,9 +98,10 @@ def _fetch_mayhem_codex() -> list[dict]:
     if not entries:
         raise ValueError("parsed 0 mayhem augments — module structure changed?")
 
-    # 官方 zh 名與圖示(cherry-augments,以正規化名對回)
+    # 官方 zh 名、圖示、內部名(cherry-augments,以正規化名對回)
     zh_names: dict[str, str] = {}
     icons: dict[str, str] = {}
+    base_names: dict[str, str] = {}  # 正規化英文名 → 字串表內部名(去 ARAM_)
     try:
         en_list = fetch_json(CHERRY_AUG_URL.format(loc="default"))
         zh_list = {a["id"]: a for a in fetch_json(CHERRY_AUG_URL.format(loc="zh_tw"))}
@@ -86,16 +115,59 @@ def _fetch_mayhem_codex() -> list[dict]:
             icon = a.get("augmentSmallIconPath", "")
             if icon:
                 icons[key] = _icon_url(icon)
+            nid = a.get("augmentNameId", "")
+            if nid:
+                base_names[key] = re.sub(r"[^a-z0-9]", "",
+                                         nid.replace("ARAM_", "").lower())
     except Exception as exc:  # noqa: BLE001 — 名稱對照失敗只影響 zh/圖示
         logger.warning("cherry-augments merge failed: %s", exc)
 
+    # 官方 zh 說明索引:內部名 → summary 原文(遊戲字串表)
+    official: dict[str, str] = {}
+    try:
+        st = fetch_json(_STRINGTABLE_URL)["entries"]
+        for k, v in st.items():
+            m = _SUMMARY_KEY_RE.match(k)
+            if m:
+                official.setdefault(m.group(1), v)
+    except Exception as exc:  # noqa: BLE001 — 官方 zh 說明拿不到就走規則翻譯
+        logger.warning("stringtable fetch failed: %s", exc)
+
+    from .arena_balance import build_entity_name_map
+    from .translate import translate_description
+    name_map = build_entity_name_map()
     for e in entries:
         key = _name_key(e["nameEn"])
         e["nameZh"] = zh_names.get(key)
         e["icon"] = icons.get(key)
-    matched = sum(1 for e in entries if e["nameZh"])
-    logger.info("mayhem codex: %d augments, %d with zh names",
-                len(entries), matched)
+        if e["nameZh"]:
+            name_map[e["nameEn"].lower()] = e["nameZh"]
+
+    curated = _load_curated()  # 人工整段翻譯(以英文強化名為 key)
+    n_official = n_rule = n_curated = 0
+    for e in entries:
+        key = _name_key(e["nameEn"])
+        raw_zh = official.get(base_names.get(key, ""))
+        if e["nameEn"] in curated:
+            e["descZh"] = curated[e["nameEn"]]
+            e["descComplete"] = True
+            n_curated += 1
+        elif raw_zh and "@" not in raw_zh:
+            # 官方 zh(無佔位符):清標籤後直接用,最高品質
+            e["descZh"] = render_description(raw_zh, {}, locale="zh_tw")
+            e["descComplete"] = True
+            n_official += 1
+        else:
+            zh, complete = translate_description(e["desc"], name_map)
+            e["descZh"] = zh
+            e["descComplete"] = complete
+            if complete:
+                n_rule += 1
+    logger.info("mayhem codex: %d augments, %d zh names, descZh: "
+                "%d curated / %d official / %d rule / %d english",
+                len(entries), sum(1 for e in entries if e["nameZh"]),
+                n_curated, n_official, n_rule,
+                len(entries) - n_curated - n_official - n_rule)
     return entries
 
 
@@ -136,11 +208,14 @@ def format_mayhem_detail(e: dict, locale: str) -> str:
     name_zh = e.get("nameZh") or e["nameEn"]
     if locale == "zh_tw":
         head = f"{icon} {zh} Mayhem 強化:{name_zh}({e['nameEn']})"
-        note = "(說明取自英文 wiki;官方未提供 Mayhem 強化的中文說明)"
+        body = e.get("descZh") or e["desc"]
+        note = ("(部分說明為規則式翻譯,未完整翻出處保留英文;數值以英文 wiki 為準)"
+                if not e.get("descComplete") else "")
     else:
         head = f"{icon} {en_label} Mayhem Augment: {e['nameEn']}"
+        body = e["desc"]
         note = ""
-    lines = [head, "─" * 30, e["desc"] or "(無說明文字)"]
+    lines = [head, "─" * 30, body or "(無說明文字)"]
     if note:
         lines.append(note)
     return "\n".join(lines)
@@ -203,7 +278,7 @@ def do_list_mayhem_augments(tier: str = "all", locale: str = "zh_tw") -> str:
         rarity = _TIER_ALIASES.get(want)
         want_slug = slug_by_rarity.get(rarity, want)
     lines = ["ARAM Mayhem 海克斯強化清單",
-             "(說明取自英文 wiki;官方未提供中文說明)", ""]
+             "(中文說明優先取官方遊戲字串,其餘規則式翻譯;數值以英文 wiki 為準)", ""]
     for slug in ("silver", "gold", "prismatic"):
         if want_slug and slug != want_slug:
             continue
@@ -213,8 +288,9 @@ def do_list_mayhem_augments(tier: str = "all", locale: str = "zh_tw") -> str:
         icon, zh, _ = TIER_LABEL[slug]
         lines.append(f"## {icon} {zh} — {len(group)} 個")
         for e in sorted(group, key=lambda x: x.get("nameZh") or x["nameEn"]):
+            summary = first_sentence(e.get("descZh") or e["desc"])
             lines.append(f"- **{e.get('nameZh') or e['nameEn']}**({e['nameEn']})"
-                         f":{first_sentence(e['desc'])}")
+                         f":{summary}")
         lines.append("")
     lines.append(_mayhem_source(result, locale))
     return "\n".join(lines)

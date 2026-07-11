@@ -23,6 +23,8 @@ logger = logging.getLogger(__name__)
 
 # 人工校訂的整句對照(Claude 逐句翻譯、隨套件出貨)。
 # key = 去除粗斜體標記後的英文原句;wiki 改句子後 miss → 退回規則/🔤。
+# (Mayhem 強化說明的整段人工翻譯另存 mayhem_zh.json,以英文強化名為 key,
+#  於 mayhem_augments 建檔時套用,不走這裡的整句比對。)
 _OVERRIDES_PATH = Path(__file__).resolve().parent / "data" / "mapchanges_zh.json"
 _overrides: dict[str, str] | None = None
 
@@ -265,6 +267,19 @@ _STRUCTURES = [
                 r"(?: from (?P<z>.+?))?\.?$", re.I), "降低至"),
 ]
 
+# 說明句型(Mayhem 圖鑑等):Grants X. / Increases X by Y. / Gain X.
+# build 收 {群組名: 已 gloss 的值} dict,回傳中文句。
+_DESC_STRUCTURES = [
+    (re.compile(r"^(?:Grants?|Gains?) (?P<y>.+?)\.?$", re.I),
+     lambda g: f"獲得{g['y']}。"),
+    (re.compile(r"^Increases? (?:your )?(?P<x>.+?) by (?P<y>.+?)\.?$", re.I),
+     lambda g: f"{g['x']}提高 {g['y']}。"),
+    (re.compile(r"^(?:Reduces?|Decreases?) (?:your )?(?P<x>.+?) by (?P<y>.+?)\.?$",
+                re.I), lambda g: f"{g['x']}降低 {g['y']}。"),
+    (re.compile(r"^Deals? (?P<y>.+?) (?:increased|bonus) damage\.?$", re.I),
+     lambda g: f"造成的傷害提高 {g['y']}。"),
+]
+
 _ARROW_RE = re.compile(r"^(?P<label>[^:：]+)[:：]\s*(?P<vals>.+⇒.+)$")
 
 
@@ -350,6 +365,16 @@ def translate_line(text: str, name_map: dict[str, str] | None = None,
             return out + "。", True
         return original, False
 
+    # 說明句型(Grants X. / Increases X by Y. 等,Mayhem 圖鑑用)
+    for pattern, build in _DESC_STRUCTURES:
+        m = pattern.match(plain)
+        if not m:
+            continue
+        glossed = {k: _gloss(v) for k, v in m.groupdict().items() if v}
+        if any(_leftover_words(v) for v in glossed.values()):
+            return original, False
+        return _CJK_SPACE_RE.sub("", build(glossed)), True
+
     if _looks_like_name(plain):
         return original, True  # 名稱行:保留原文、不算翻譯失敗
 
@@ -370,3 +395,41 @@ def translate_lines(lines: list[str], name_map: dict[str, str] | None = None
         zh, complete = translate_line(body, name_map, name_re)
         out.append(f"{prefix}{zh}" if complete else f"{prefix}🔤 {body}")
     return out
+
+
+# 句子切分:句號/驚嘆號/問號 + 空白;不切括號內、不切小數點
+_SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9])")
+
+
+def translate_description(text: str, name_map: dict[str, str] | None = None
+                          ) -> tuple[str, bool]:
+    """整段說明(可多句)→ (中文, 是否全部翻出)。
+
+    先查整段人工對照;否則逐句翻譯,翻不出的句子保留英文(整段標為
+    未完成,呼叫端據此在段末加註「部分未譯」)。段內換行分別處理。
+    """
+    whole = _load_overrides().get(text.replace("**", "").replace("*", "").strip())
+    name_re = compile_name_map(name_map) if name_map else None
+    if whole:
+        zh = whole
+        if name_re is not None:
+            zh = name_re.sub(lambda m: name_map[m.group(1).lower()], zh)
+        return _CJK_SPACE_RE.sub("", zh), True
+
+    all_complete = True
+    out_lines: list[str] = []
+    for para in text.split("\n"):
+        para = para.strip()
+        if not para:
+            out_lines.append("")
+            continue
+        pieces = []
+        for sent in _SENTENCE_SPLIT.split(para):
+            sent = sent.strip()
+            if not sent:
+                continue
+            zh, ok = translate_line(sent, name_map, name_re)
+            all_complete = all_complete and ok
+            pieces.append(zh)
+        out_lines.append("".join(pieces))
+    return "\n".join(out_lines).strip(), all_complete
