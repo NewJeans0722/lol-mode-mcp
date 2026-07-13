@@ -3,6 +3,7 @@
 > 給下一個 session(和未來的自己):開場先讀這份。
 > 專案需求原文在 `LOL_MCP_BRIEF.md`。
 > **新 patch 更新照 `UPDATE_SOP.md`,先跑 `uv run python scripts/check_update.py`。**
+> **上線架構(網域/Cloudflare/Render/冷啟動)見 `DOMAIN_SETUP.md`。**
 
 ## 目前狀態(2026-07-09)
 
