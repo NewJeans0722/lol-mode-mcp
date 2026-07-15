@@ -193,6 +193,18 @@ src/lol_mode_mcp/
 
 ## 日誌
 
+- **2026-07-14**(V26.14「黏在一起」bug + 官方 HTML 格式變遷):
+  V26.14 起 Riot 官方繁中 patch notes 的競技場英雄條目名
+  從 `<p><strong>名稱</strong></p>` 改為 `<p>名稱</p>`(不加粗)。
+  official_notes.py `_TOKEN_RE` 已兼容兩種:新增 `<p>`(不含 strong)
+  的 regex alternation,且 parser 的 capture group 從 4 組擴為 5 組。
+  V26.14 競技場 13 英雄/4 道具/4 增幅全部獨立分開。
+  ⚠️ 日後若官方再改 HTML 結構:重抓官網存 local HTML,跟存好的
+  前版 diff tag 序列,再調 `_TOKEN_RE`。邏輯全在 `official_notes.py`
+  `parse_official_notes`,不到 60 行。
+- **2026-07-13**(網域 zhongqqq.win + Cloudflare + 架站 SOP):
+  見 `DOMAIN_SETUP.md`。Cloudflare Registrar 買網域、DNS 加 CNAME、
+  先灰雲後橘雲、SSL Full、UptimeRobot 防休眠。
 - **2026-07-12**(Mayhem 強化說明中文化 = 0%→**100%**):使用者:
   「你也沒翻譯,請按照先前規格處理好」。Mayhem 圖鑑原本只顯示英文說明。
   - **descZh 三層來源(mayhem_augments.py `_fetch_mayhem_codex`)**:

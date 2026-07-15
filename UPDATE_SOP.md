@@ -26,6 +26,11 @@ uv run python scripts/check_update.py
 | 5 | 對照檔時效 | key 全對得上 | 列出的舊 key 可刪(強化被移除/改名) |
 | 6 | 機制/貴賓 | (永遠提醒) | 大改版才需要,見下方 |
 
+**額外手動檢查(patch 改動)**:開網站或 MCP tool 查最新版,
+確認英雄名稱是否獨立顯示、沒黏在一起。若黏住 = Riot 改了官方筆記
+的 HTML 結構(上次 V26.14 把 `<p><strong>` 改成 `<p>` 純文字),
+修 `official_notes.py` 的 `_TOKEN_RE` 和 group 對應(<60 行)。
+
 ## 補翻譯的規矩(正確性優先,沿用既有標準)
 
 1. **數值一律以英文 wiki 為準**(Mayhem 尤其:官方遊戲字串的

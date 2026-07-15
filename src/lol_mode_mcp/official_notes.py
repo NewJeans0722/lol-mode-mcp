@@ -5,9 +5,10 @@ wiki 的 patch 頁本來就是轉錄官方 patch notes,所以官方繁中頁面
 不需要規則式翻譯。英文版仍用 wiki(結構化程度較好)。
 
 頁面是伺服器端渲染(不用跑 JS),內容在 #patch-notes-container:
-  <h2>競技場</h2> … <h4>增幅裝置</h4>
-  <p><strong>增益麻吉</strong></p><ul><li>改動行…</li></ul>
-一般對戰的英雄則是 <h3>巴德</h3> + <h4>技能名</h4> + <li>。
+  競技場/大混戰(flat):<h4>分類</h4> <p>條目名</p> <li>改動行</li>
+  (26.13 以前條目名是 <p><strong>條目</strong></p>,
+   26.14 起變成 <p>條目</p>(不加粗),兩種都要兼容)
+一般對戰(champ):<h3>英雄</h3> → <h4>技能名</h4> → <li>。
 注意:要帶瀏覽器 User-Agent 並跟隨 307 轉址。
 
 slug 規則:26.4 起是 league-of-legends-patch-26-13-notes,
@@ -42,7 +43,8 @@ _H2_SCOPE = [
 
 _TOKEN_RE = re.compile(
     r"<(h2|h3|h4)[^>]*>(.*?)</\1>"           # 標題
-    r"|<p[^>]*>\s*<strong[^>]*>(.*?)</strong>\s*</p>"  # 條目名(競技場式)
+    r"|<p[^>]*>\s*<strong[^>]*>(.*?)</strong>\s*</p>"  # 條目名(26.13 以前,加粗)
+    r"|<p[^>]*>(?!\s*<strong)(.*?)</p>"      # 條目名(26.14 起,不加粗)
     r"|<li[^>]*>(.*?)</li>",                 # 改動行
     re.S)
 
@@ -73,7 +75,8 @@ def parse_official_notes(page_html: str) -> dict[str, list[dict]]:
         entry = None
 
     for m in _TOKEN_RE.finditer(body):
-        tag, htext, strong, li = m.group(1), m.group(2), m.group(3), m.group(4)
+        tag, htext, strong, plain_p, li = (
+            m.group(1), m.group(2), m.group(3), m.group(4), m.group(5))
         if tag == "h2":
             text = _text(htext)
             scope = None
@@ -96,11 +99,14 @@ def parse_official_notes(page_html: str) -> dict[str, list[dict]]:
         elif tag == "h4" and style == "champ":
             if entry is not None:
                 entry["lines"].append("- " + _text(htext))
-        elif strong is not None and style == "flat":
+        # 競技場/大混戰條目名:26.13 前 <p><strong>,26.14 起 <p>(plain)
+        elif (strong is not None or plain_p is not None) and style == "flat":
             if cat is None:
                 new_cat("其他")
-            entry = {"name": _text(strong), "lines": []}
-            cat["entries"].append(entry)
+            name = _text(strong or plain_p)
+            if name and re.search(r"\S", name):  # 略過全空白行
+                entry = {"name": name, "lines": []}
+                cat["entries"].append(entry)
         elif li is not None and entry is not None:
             # champ 式:li 掛在最近的技能(h4)之下縮一層;flat 式不縮
             indent = "  " if (style == "champ" and any(
