@@ -221,7 +221,7 @@ mcp.custom_route("/api/patch-notes", methods=["GET"])(api_patch_notes)
 mcp.custom_route("/api/backgrounds", methods=["GET"])(api_backgrounds)
 mcp.custom_route("/api/mayhem-augments", methods=["GET"])(api_mayhem_augments)
 mcp.custom_route("/api/mechanics", methods=["GET"])(api_mechanics)
-mcp.custom_route("/api/save-facing", methods=["POST"])(api_save_facing)
+mcp.custom_route("/api/save-facing", methods=["GET"])(api_save_facing)
 
 
 def main() -> None:

@@ -415,18 +415,14 @@ def _backgrounds_payload() -> dict:
 
 async def api_save_facing(request: Request) -> JSONResponse:
     """儲存單一造型的位置/翻轉設定(splash_facing.json)。"""
-    try:
-        body = await request.json()
-    except Exception:
-        return JSONResponse({"error": "invalid json"}, status_code=400)
-    key = (body or {}).get("key", "").strip()
-    pos_x = (body or {}).get("posX")
-    flip = (body or {}).get("flip")
-    if not key or pos_x is None or flip is None:
+    key = request.query_params.get("key", "").strip()
+    pos_x_str = request.query_params.get("posX", "")
+    flip_str = request.query_params.get("flip", "")
+    if not key or not pos_x_str or not flip_str:
         return JSONResponse({"error": "need key, posX, flip"}, status_code=400)
     try:
-        pos_x = max(0, min(100, int(pos_x)))
-        flip = bool(flip)
+        pos_x = max(0, min(100, int(pos_x_str)))
+        flip = flip_str.lower() in ("true", "1", "yes")
     except (ValueError, TypeError):
         return JSONResponse({"error": "invalid values"}, status_code=400)
     try:

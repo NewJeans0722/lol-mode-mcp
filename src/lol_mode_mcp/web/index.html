@@ -582,12 +582,9 @@ async function _saveFacing() {
   const sk = _currentRightSkin();
   if (!sk) return;
   const key = sk.cid + "_" + sk.num;
+  const url = `/api/save-facing?key=${encodeURIComponent(key)}&posX=${sk.posX}&flip=${sk.flip}`;
   try {
-    const r = await fetch("/api/save-facing", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key, posX: sk.posX, flip: sk.flip }),
-    });
+    const r = await fetch(url);
     if (!r.ok) throw new Error((await r.json()).error || r.status);
     $("bg-save").classList.add("saved");
     const leftVal = $("bg-left-select").value;
