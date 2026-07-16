@@ -211,7 +211,7 @@ def mode_mechanics() -> str:
 # MCP 客戶端仍走 /mcp,互不干擾。stdio 模式下這些路由不存在。
 from .web import (api_aram, api_arena_balance, api_augments,  # noqa: E402
                   api_backgrounds, api_mayhem_augments, api_mechanics,
-                  api_patch_notes, api_save_facing, home)
+                  api_patch_notes, home)
 
 mcp.custom_route("/", methods=["GET"])(home)
 mcp.custom_route("/api/augments", methods=["GET"])(api_augments)
@@ -221,7 +221,6 @@ mcp.custom_route("/api/patch-notes", methods=["GET"])(api_patch_notes)
 mcp.custom_route("/api/backgrounds", methods=["GET"])(api_backgrounds)
 mcp.custom_route("/api/mayhem-augments", methods=["GET"])(api_mayhem_augments)
 mcp.custom_route("/api/mechanics", methods=["GET"])(api_mechanics)
-mcp.custom_route("/api/save-facing", methods=["GET"])(api_save_facing)
 
 
 def main() -> None:

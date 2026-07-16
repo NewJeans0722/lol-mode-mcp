@@ -440,6 +440,28 @@ async def api_save_facing(request: Request) -> JSONResponse:
 
 
 async def api_backgrounds(request: Request) -> Response:
+    # 存檔模式:?save=1&key=X&posX=Y&flip=Z
+    if request.query_params.get("save") == "1":
+        key = request.query_params.get("key", "").strip()
+        try:
+            pos_x = max(0, min(100, int(request.query_params.get("posX", "50"))))
+            flip = request.query_params.get("flip", "false").lower() in ("true", "1")
+        except (ValueError, TypeError):
+            return JSONResponse({"error": "invalid posX/flip"}, status_code=400)
+        if not key:
+            return JSONResponse({"error": "need key"}, status_code=400)
+        try:
+            data = json.loads(_FACING_PATH.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            data = {"_meta": {}, "facing": {}}
+        data.setdefault("facing", {})[key] = {"posX": pos_x, "flip": flip}
+        data["_meta"]["last_updated"] = time.strftime("%Y-%m-%d")
+        _FACING_PATH.write_text(
+            json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        cache.clear()  # 讓 payload 重建時吃到新 facing 資料
+        logger.info("facing saved via backgrounds API: %s -> posX=%d flip=%s",
+                    key, pos_x, flip)
+        # 不直接 return，繼續往下回傳更新後的 backgrounds 資料
     return _cached_json(request, "api_backgrounds", _backgrounds_payload,
                         ttl=12 * 3600)
 
