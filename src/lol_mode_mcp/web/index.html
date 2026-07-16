@@ -70,7 +70,7 @@
   #bg {
     position: fixed; top: 0; right: 0; bottom: 0; z-index: -3;
     width: min(48vw, 920px); pointer-events: none;
-    background-size: cover; background-position: center 22%;
+    background-size: cover; background-position-y: 22%;
     -webkit-mask-image: linear-gradient(to left, rgba(0,0,0,.95) 42%, transparent 97%);
     mask-image: linear-gradient(to left, rgba(0,0,0,.95) 42%, transparent 97%);
   }
@@ -85,7 +85,7 @@
   #bg-left {
     position: fixed; top: 0; left: 0; bottom: 0; z-index: -3;
     width: min(48vw, 920px); pointer-events: none;
-    background-size: cover; background-position: center 22%;
+    background-size: cover; background-position-y: 22%;
     -webkit-mask-image: linear-gradient(to right, rgba(0,0,0,.95) 42%, transparent 97%);
     mask-image: linear-gradient(to right, rgba(0,0,0,.95) 42%, transparent 97%);
   }
@@ -105,7 +105,7 @@
   @media (max-width: 1100px) {
     #bg-left { display: none; }
     #bg {
-      width: 100vw;
+      width: 100vw; background-position-x: 50% !important;
       -webkit-mask-image: none; mask-image: none;
     }
     #bg::after {
@@ -143,6 +143,14 @@
     clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
   }
   .langs button.active { color: var(--accent); border-color: var(--accent); }
+  #bg-edit { display: inline-flex; gap: 2px; }
+  #bg-edit button {
+    padding: 2px 7px; font-size: 14px; cursor: pointer; font-family: inherit;
+    border: 1px solid var(--line); background: var(--panel); color: var(--muted);
+    clip-path: polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px);
+  }
+  #bg-edit button:hover { color: var(--text); border-color: var(--gold); }
+  #bg-save.saved { color: var(--buff); border-color: var(--buff); }
   /* 字體大小(zoom 縮放整頁,現代瀏覽器皆支援) */
   body.fs-lg { zoom: 1.15; }
   body.fs-xl { zoom: 1.3; }
@@ -342,6 +350,12 @@
       <button id="font-btn" title="字體大小">A</button>
       <select id="bg-left-select" title="左側背景"><option value="">左景:無</option></select>
       <select id="bg-select" title="右側背景"><option value="">右景:無</option></select>
+      <span id="bg-edit" hidden>
+        <button id="bg-left-nudge" title="人物往左">◀</button>
+        <button id="bg-right-nudge" title="人物往右">▶</button>
+        <button id="bg-flip" title="水平翻轉">↔</button>
+        <button id="bg-save" title="儲存位置">💾</button>
+      </span>
     </div>
   </nav>
 </header>
@@ -516,29 +530,84 @@ $("theme-btn").onclick = () =>
 try { setTheme(localStorage.getItem("theme") || "dark"); } catch (e) {}
 
 /* ---------------- 背景原畫(官方 splash,左右雙欄) ---------------- */
-// 預設:兩側皆「無」,想看原畫自己從選單挑;選過的會記住。
-// 儲存鍵 v2:上一版曾把舊預設寫進訪客的 localStorage,升版讓大家重置一次。
+// 右側面板＝編輯面板：調整 posX(水平位置%)與 flip(翻轉)。
+// 左側面板自動鏡射：posX←100−posX、flip←!flip。
 const BG_SIDES = {
   right: { el: "bg", sel: "bg-select", store: "bgRight2", def: () => "" },
   left:  { el: "bg-left", sel: "bg-left-select", store: "bgLeft2", def: () => "" },
 };
+state._bgSkin = {};  // {right: {cid,num,posX,flip}, left: ...}
+
+function _getSkin(v) {
+  if (!v) return null;
+  const [cid, num] = v.split("_");
+  const c = (state.bgs || []).find((x) => x.id === cid);
+  return c && c.skins.find((x) => String(x.num) === num);
+}
+
 function setBg(side, v) {
   const cfg = BG_SIDES[side];
   v = v || "";
   $(cfg.sel).value = v;
-  let url = "";
-  let bodySide = "right";  // 預設:人物靠右
-  if (v) {
-    const [cid, num] = v.split("_");
-    const c = (state.bgs || []).find((x) => x.id === cid);
-    const s = c && c.skins.find((x) => String(x.num) === num);
-    if (s) { url = s.url; bodySide = s.bodySide || "right"; }
+  const s = _getSkin(v);
+  let url = "", posX = 50, flip = false;
+  if (s) {
+    url = s.url;
+    posX = s.posX != null ? s.posX : 50;
+    flip = s.flip || false;
+    if (side === "left") { posX = 100 - posX; flip = !flip; }
   }
   $(cfg.el).style.backgroundImage = url ? `url("${url}")` : "";
-  // 人物靠哪邊≠面板靠哪邊時要翻轉
-  const needFlip = bodySide !== side;
-  $(cfg.el).classList.toggle("flip", url && needFlip);
+  $(cfg.el).style.backgroundPositionX = url ? posX + "%" : "";
+  $(cfg.el).classList.toggle("flip", url && flip);
+  state._bgSkin[side] = s ? { cid: v.split("_")[0], num: v.split("_")[1], posX: s.posX, flip: s.flip } : null;
   try { localStorage.setItem(cfg.store, v); } catch (e) {}
+  if (side === "right") { $("bg-edit").hidden = !v; _updateEditBtns(); }
+}
+
+/* ---- 編輯按鈕(右側面板) ---- */
+function _currentRightSkin() { return state._bgSkin.right; }
+function _updateEditBtns() {
+  const sk = _currentRightSkin();
+  if (!sk) return;
+  $("bg-flip").textContent = sk.flip ? "↔✓" : "↔";
+  $("bg-save").classList.remove("saved");
+}
+async function _saveFacing() {
+  const sk = _currentRightSkin();
+  if (!sk) return;
+  const key = sk.cid + "_" + sk.num;
+  try {
+    const r = await fetch("/api/save-facing", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key, posX: sk.posX, flip: sk.flip }),
+    });
+    if (!r.ok) throw new Error((await r.json()).error || r.status);
+    $("bg-save").classList.add("saved");
+    const leftVal = $("bg-left-select").value;
+    if (leftVal === key) setBg("left", leftVal);
+  } catch (e) { alert("儲存失敗:" + e.message); }
+}
+function _nudgeBg(delta) {
+  const sk = _currentRightSkin();
+  if (!sk) return;
+  sk.posX = Math.max(0, Math.min(100, (sk.posX || 50) + delta));
+  $("bg").style.backgroundPositionX = sk.posX + "%";
+  _updateEditBtns();
+}
+function _toggleFlip() {
+  const sk = _currentRightSkin();
+  if (!sk) return;
+  sk.flip = !sk.flip;
+  $("bg").classList.toggle("flip", sk.flip);
+  _updateEditBtns();
+}
+$("bg-left-nudge").onclick = () => _nudgeBg(-2);
+$("bg-right-nudge").onclick = () => _nudgeBg(2);
+$("bg-flip").onclick = () => _toggleFlip();
+$("bg-save").onclick = () => _saveFacing();
+
 async function initBg() {
   try {
     const r = await fetch("/api/backgrounds");
@@ -546,8 +615,8 @@ async function initBg() {
     state.bgs = (await r.json()).champions;
     const groups = state.bgs.map((c) => `<optgroup label="${esc(c.name)}">` +
       c.skins.map((s) => {
-        const arrow = s.bodySide === "left" ? " ◀" : "";
-        return `<option value="${c.id}_${s.num}">${esc(s.name)}${arrow}</option>`;
+        const tag = (s.posX !== 50 || s.flip) ? " *" : "";
+        return `<option value="${c.id}_${s.num}">${esc(s.name)}${tag}</option>`;
       }).join("") +
       "</optgroup>").join("");
     for (const [side, cfg] of Object.entries(BG_SIDES)) {

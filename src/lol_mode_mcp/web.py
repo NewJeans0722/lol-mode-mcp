@@ -17,6 +17,7 @@ import json
 import logging
 import os
 import re
+import time
 from pathlib import Path
 
 from starlette.requests import Request
@@ -372,17 +373,21 @@ _CHAMP_DETAIL_URL = "https://ddragon.leagueoflegends.com/cdn/{ver}/data/zh_TW/ch
 _VERSIONS_URL = "https://ddragon.leagueoflegends.com/api/versions.json"
 
 
+_FACING_PATH = Path(__file__).resolve().parent / "data" / "splash_facing.json"
+
+
+def _load_facing() -> dict:
+    try:
+        return json.loads(_FACING_PATH.read_text(encoding="utf-8")).get("facing", {})
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
 def _backgrounds_payload() -> dict:
     import httpx
 
     from .http_util import fetch_json
-    # 人物靠左/靠右對照(預設靠右)
-    facing_path = Path(__file__).resolve().parent / "data" / "splash_facing.json"
-    try:
-        facing_data = json.loads(facing_path.read_text(encoding="utf-8"))
-        facing_map = facing_data.get("facing", {})
-    except (OSError, json.JSONDecodeError):
-        facing_map = {}
+    facing_map = _load_facing()
     ver = fetch_json(_VERSIONS_URL)[0]
     champions = []
     with httpx.Client(timeout=10) as client:
@@ -398,13 +403,44 @@ def _backgrounds_payload() -> dict:
                     continue
                 name = "經典原畫" if s["name"] == "default" else s["name"]
                 key = f"{cid}_{s['num']}"
-                body_side = facing_map.get(key, "right")  # 預設靠右
+                cfg = facing_map.get(key, {})
                 skins.append({"num": s["num"], "name": name, "url": url,
-                               "bodySide": body_side})
+                               "posX": cfg.get("posX", 50),
+                               "flip": cfg.get("flip", False)})
             champions.append({"id": cid, "name": data["name"], "skins": skins})
     logger.info("backgrounds loaded: %s",
                 {c["id"]: len(c["skins"]) for c in champions})
     return {"champions": champions}
+
+
+async def api_save_facing(request: Request) -> JSONResponse:
+    """儲存單一造型的位置/翻轉設定(splash_facing.json)。"""
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "invalid json"}, status_code=400)
+    key = (body or {}).get("key", "").strip()
+    pos_x = (body or {}).get("posX")
+    flip = (body or {}).get("flip")
+    if not key or pos_x is None or flip is None:
+        return JSONResponse({"error": "need key, posX, flip"}, status_code=400)
+    try:
+        pos_x = max(0, min(100, int(pos_x)))
+        flip = bool(flip)
+    except (ValueError, TypeError):
+        return JSONResponse({"error": "invalid values"}, status_code=400)
+    try:
+        data = json.loads(_FACING_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        data = {"_meta": {}, "facing": {}}
+    data.setdefault("facing", {})[key] = {"posX": pos_x, "flip": flip}
+    data["_meta"]["last_updated"] = time.strftime("%Y-%m-%d")
+    _FACING_PATH.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    # 清除快取讓下次 backgrounds API 回傳新值
+    cache.clear()
+    logger.info("facing saved: %s -> posX=%d flip=%s", key, pos_x, flip)
+    return JSONResponse({"ok": True, "key": key, "posX": pos_x, "flip": flip})
 
 
 async def api_backgrounds(request: Request) -> Response:
