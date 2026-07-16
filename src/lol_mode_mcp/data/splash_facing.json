@@ -1,8 +1,7 @@
 {
   "_meta": {
-    "description": "原畫位置與翻轉設定。key = ChampionId_SkinNum（同背景選單 value）。posX = 右側面板背景水平位置百分比(預設 50=置中)；flip = 右側面板是否水平翻轉。左側面板自動鏡射(posX→100-posX, flip→!flip)。存檔方式：網站右側面板調整後點 💾。",
+    "description": "需要翻轉的原畫清單(人物靠左，右側面板需翻轉)。key = ChampionId_SkinNum。",
     "last_updated": "2026-07-16"
   },
-  "facing": {
-  }
+  "flip": ["Zoe_22", "Briar_20"]
 }

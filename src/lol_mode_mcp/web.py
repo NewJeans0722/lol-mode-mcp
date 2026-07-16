@@ -17,7 +17,6 @@ import json
 import logging
 import os
 import re
-import time
 from pathlib import Path
 
 from starlette.requests import Request
@@ -373,95 +372,48 @@ _CHAMP_DETAIL_URL = "https://ddragon.leagueoflegends.com/cdn/{ver}/data/zh_TW/ch
 _VERSIONS_URL = "https://ddragon.leagueoflegends.com/api/versions.json"
 
 
-_FACING_PATH = Path(__file__).resolve().parent / "data" / "splash_facing.json"
+# 需要翻轉的 skin key(ChampionId_SkinNum):人物靠左，右側面板要翻轉
+_FLIP_SKINS = {"Zoe_22", "Briar_20"}
 
-
-def _load_facing() -> dict:
-    try:
-        return json.loads(_FACING_PATH.read_text(encoding="utf-8")).get("facing", {})
-    except (OSError, json.JSONDecodeError):
-        return {}
+# Zoe:只保留指定 skin; Briar:全部保留(不含 default/0)
+_KEEP_SKINS = {
+    "Zoe": {0, 1, 9, 22, 43},
+    "Briar": None,  # None = 只排除 default(0)
+}
 
 
 def _backgrounds_payload() -> dict:
     import httpx
 
     from .http_util import fetch_json
-    facing_map = _load_facing()
     ver = fetch_json(_VERSIONS_URL)[0]
     champions = []
     with httpx.Client(timeout=10) as client:
         for cid in BG_CHAMPIONS:
             data = fetch_json(_CHAMP_DETAIL_URL.format(ver=ver, cid=cid))["data"][cid]
+            keep = _KEEP_SKINS.get(cid)
             skins = []
             for s in data["skins"]:
-                url = _SPLASH_URL.format(cid=cid, num=s["num"])
+                num = s["num"]
+                if keep is not None and num not in keep and not (num == 0 and keep is None):
+                    continue
+                url = _SPLASH_URL.format(cid=cid, num=num)
                 try:
                     if client.head(url).status_code != 200:
-                        continue  # 炫彩無獨立原畫
+                        continue
                 except httpx.HTTPError:
                     continue
                 name = "經典原畫" if s["name"] == "default" else s["name"]
-                key = f"{cid}_{s['num']}"
-                cfg = facing_map.get(key, {})
-                skins.append({"num": s["num"], "name": name, "url": url,
-                               "posX": cfg.get("posX", 50),
-                               "flip": cfg.get("flip", False)})
+                key = f"{cid}_{num}"
+                skins.append({"num": num, "name": name, "url": url,
+                               "flip": key in _FLIP_SKINS})
             champions.append({"id": cid, "name": data["name"], "skins": skins})
     logger.info("backgrounds loaded: %s",
                 {c["id"]: len(c["skins"]) for c in champions})
     return {"champions": champions}
 
 
-async def api_save_facing(request: Request) -> JSONResponse:
-    """儲存單一造型的位置/翻轉設定(splash_facing.json)。"""
-    key = request.query_params.get("key", "").strip()
-    pos_x_str = request.query_params.get("posX", "")
-    flip_str = request.query_params.get("flip", "")
-    if not key or not pos_x_str or not flip_str:
-        return JSONResponse({"error": "need key, posX, flip"}, status_code=400)
-    try:
-        pos_x = max(0, min(100, int(pos_x_str)))
-        flip = flip_str.lower() in ("true", "1", "yes")
-    except (ValueError, TypeError):
-        return JSONResponse({"error": "invalid values"}, status_code=400)
-    try:
-        data = json.loads(_FACING_PATH.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        data = {"_meta": {}, "facing": {}}
-    data.setdefault("facing", {})[key] = {"posX": pos_x, "flip": flip}
-    data["_meta"]["last_updated"] = time.strftime("%Y-%m-%d")
-    _FACING_PATH.write_text(
-        json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    # 清除快取讓下次 backgrounds API 回傳新值
-    cache.clear()
-    logger.info("facing saved: %s -> posX=%d flip=%s", key, pos_x, flip)
-    return JSONResponse({"ok": True, "key": key, "posX": pos_x, "flip": flip})
-
-
 async def api_backgrounds(request: Request) -> Response:
-    # 存檔模式:?save=1&key=X&posX=Y&flip=Z
-    if request.query_params.get("save") == "1":
-        key = request.query_params.get("key", "").strip()
-        try:
-            pos_x = max(0, min(100, int(request.query_params.get("posX", "50"))))
-            flip = request.query_params.get("flip", "false").lower() in ("true", "1")
-        except (ValueError, TypeError):
-            return JSONResponse({"error": "invalid posX/flip"}, status_code=400)
-        if not key:
-            return JSONResponse({"error": "need key"}, status_code=400)
-        try:
-            data = json.loads(_FACING_PATH.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            data = {"_meta": {}, "facing": {}}
-        data.setdefault("facing", {})[key] = {"posX": pos_x, "flip": flip}
-        data["_meta"]["last_updated"] = time.strftime("%Y-%m-%d")
-        _FACING_PATH.write_text(
-            json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-        cache.clear()  # 讓 payload 重建時吃到新 facing 資料
-        logger.info("facing saved via backgrounds API: %s -> posX=%d flip=%s",
-                    key, pos_x, flip)
-        # 不直接 return，繼續往下回傳更新後的 backgrounds 資料
     return _cached_json(request, "api_backgrounds", _backgrounds_payload,
                         ttl=12 * 3600)
 
