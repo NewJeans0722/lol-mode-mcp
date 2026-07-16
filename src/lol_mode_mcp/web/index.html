@@ -427,13 +427,57 @@ const TIERS = [
 ];
 const state = { augs: null, aram: null, arena: null, patch: null, tier: "all", augQ: "", aramQ: "", arenaQ: "", patchQ: "", sortKey: null, sortDir: -1 };
 
-/* ---------------- 分頁切換 ---------------- */
+/* ---------------- 分頁切換(含防止重複請求的競爭保護) ---------------- */
+// 每個資料源只允許一個在途請求;切換分頁時取消舊請求
+state._loading = {};   // key → Promise(正在載入中)
+state._abort = {};     // key → AbortController
+
+/** 泛用載入器:自動去重複、取消舊請求、處理狀態顯示 */
+async function _fetchTab(key, url, onOk, statusId, staleId) {
+  // 已在載入中 → 重複使用既有的 promise,不開新請求
+  if (state._loading[key]) return state._loading[key];
+  // 取消前一次還在飛的請求
+  if (state._abort[key]) { state._abort[key].abort(); delete state._abort[key]; }
+  const ctrl = new AbortController();
+  state._abort[key] = ctrl;
+  // 顯示 loading 狀態
+  if (statusId) { const el = $(statusId); if (el) { el.hidden = false; el.textContent = "載入中…"; } }
+
+  const promise = (async () => {
+    try {
+      const r = await fetch(url, { signal: ctrl.signal });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.status);
+      const data = await r.json();
+      if (ctrl.signal.aborted) return;  // 請求完成前就被取消,不處理
+      onOk(data);
+      if (statusId) { const el = $(statusId); if (el) el.hidden = true; }
+      if (staleId && data.stale) { const el = $(staleId); if (el) el.innerHTML = '<div class="stale">⚠️ 資料源更新失敗,顯示的是上次成功抓取的快取,可能過期。</div>'; }
+    } catch (e) {
+      if (e.name === "AbortError" || ctrl.signal.aborted) return;  // 被取消,安靜略過
+      if (statusId) { const el = $(statusId); if (el) { el.hidden = false; el.textContent = "載入失敗:" + e.message; } }
+    } finally {
+      delete state._loading[key];
+      delete state._abort[key];
+    }
+  })();
+  state._loading[key] = promise;
+  return promise;
+}
+
 const TABS = ["aug", "arena", "aram", "patch", "mech"];
 function showTab(which) {
   for (const t of TABS) {
     $("page-" + t).hidden = t !== which;
     $("tab-" + t).classList.toggle("active", t === which);
   }
+  // 取消「目前不在畫面上」的進行中請求,只保留目的地分頁的
+  for (const t of TABS) {
+    if (t === which) continue;
+    const k = (t === "aug") ? "augments" : t;
+    if (state._abort[k]) { state._abort[k].abort(); delete state._abort[k]; }
+  }
+  if (which === "aug" && !state.augs) { loadAugments(); return; }
+  if (which === "aug") return;  // 已在頁尾觸發,且資料已載入
   if (which === "aram" && !state.aram) loadAram();
   if (which === "arena" && !state.arena) loadArena();
   if (which === "patch" && !state.patch) loadPatch("latest");
@@ -542,17 +586,12 @@ function renderRoleChips(elId, current, onPick) {
 
 /* ---------------- 海克斯圖鑑 ---------------- */
 async function loadAugments() {
-  try {
-    const r = await fetch("/api/augments");
-    if (!r.ok) throw new Error((await r.json()).error || r.status);
-    state.augs = await r.json();
+  await _fetchTab("augments", "/api/augments", (data) => {
+    state.augs = data;
     $("meta").innerHTML = `patch <span class="patch">${state.augs.patch}</span> · 資料更新 ${state.augs.fetched_at} · ${state.augs.augments.length} 個強化`;
     if (state.augs.stale) $("aug-stale").innerHTML = '<div class="stale">⚠️ 資料源更新失敗,顯示的是上次成功抓取的快取,可能過期。</div>';
-    $("aug-status").hidden = true;
     renderAugModes(); renderChips(); renderAugs();
-  } catch (e) {
-    $("aug-status").textContent = "載入失敗:" + e.message + "(重新整理再試一次)";
-  }
+  }, "aug-status", null);
 }
 /* 圖鑑模式:競技場(cdragon 官方雙語)/ ARAM Mayhem(名稱台服、說明英文 wiki) */
 state.augMode = "arena";
@@ -574,14 +613,9 @@ function renderAugModes() {
     };
 }
 async function loadMayhemAugs() {
-  try {
-    const r = await fetch("/api/mayhem-augments");
-    if (!r.ok) throw new Error((await r.json()).error || r.status);
-    state.maug = await r.json();
-  } catch (e) {
-    $("aug-status").hidden = false;
-    $("aug-status").textContent = "Mayhem 圖鑑載入失敗:" + e.message;
-  }
+  await _fetchTab("mayhem", "/api/mayhem-augments", (data) => {
+    state.maug = data;
+  }, "aug-status", null);
 }
 function renderChips() {
   const list = currentAugList();
@@ -632,16 +666,10 @@ $("aug-q").oninput = (e) => { state.augQ = e.target.value; renderAugs(); };
 
 /* ---------------- 競技場平衡 ---------------- */
 async function loadArena() {
-  try {
-    const r = await fetch("/api/arena-balance");
-    if (!r.ok) throw new Error((await r.json()).error || r.status);
-    state.arena = await r.json();
-    if (state.arena.stale) $("arena-stale").innerHTML = '<div class="stale">⚠️ 資料源更新失敗,顯示的是上次成功抓取的快取,可能過期。</div>';
-    $("arena-status").hidden = true;
+  await _fetchTab("arena", "/api/arena-balance", (data) => {
+    state.arena = data;
     renderArena();
-  } catch (e) {
-    $("arena-status").textContent = "載入失敗:" + e.message;
-  }
+  }, "arena-status", "arena-stale");
 }
 // "**粗體**"、"*斜體*" 是後端從 wiki 標記轉來的;先 escape 再轉標籤
 function richText(s) {
@@ -711,23 +739,17 @@ function renderScopeChips() {
     };
 }
 async function loadPatch(ver) {
-  $("patch-status").hidden = false;
-  $("patch-status").textContent = "載入中…";
-  $("patch-content").innerHTML = "";
-  try {
-    const r = await fetch("/api/patch-notes?patch=" + encodeURIComponent(ver) +
-                          "&scope=" + encodeURIComponent(state.patchScope));
-    if (!r.ok) throw new Error((await r.json()).error || r.status);
-    state.patch = await r.json();
-    if (state.patch.stale) $("patch-stale").innerHTML = '<div class="stale">⚠️ 資料源更新失敗,顯示的是上次成功抓取的快取,可能過期。</div>';
-    $("patch-status").hidden = true;
+  // 先取消舊的 patch 請求(可能 scope/version 已改變)
+  if (state._abort.patch) { state._abort.patch.abort(); delete state._abort.patch; }
+  delete state._loading.patch;
+  const url = "/api/patch-notes?patch=" + encodeURIComponent(ver) +
+              "&scope=" + encodeURIComponent(state.patchScope);
+  await _fetchTab("patch", url, (data) => {
+    state.patch = data;
     $("patch-ver").innerHTML = state.patch.patches.map((p) =>
       `<option value="${p}" ${p === state.patch.patch ? "selected" : ""}>${p}</option>`).join("");
     renderPatch();
-  } catch (e) {
-    $("patch-status").hidden = false;
-    $("patch-status").textContent = "載入失敗:" + e.message;
-  }
+  }, "patch-status", "patch-stale");
 }
 // 分類的中文標籤(和後端 CATEGORY_LABELS 對齊)
 const PCAT_ZH = { "general": "一般", "augments": "強化", "champions": "英雄",
@@ -778,18 +800,13 @@ $("patch-q").oninput = (e) => { state.patchQ = e.target.value; renderPatch(); };
 /* ---------------- 模式機制 ---------------- */
 state.mechMode = "arena";
 async function loadMech() {
-  try {
-    const r = await fetch("/api/mechanics");
-    if (!r.ok) throw new Error(r.status);
-    state.mech = await r.json();
-    $("mech-status").hidden = true;
+  await _fetchTab("mech", "/api/mechanics", (data) => {
+    state.mech = data;
     renderMech();
-  } catch (e) {
-    $("mech-status").textContent = "載入失敗:" + e.message;
-  }
+  }, "mech-status", null);
 }
 function renderMech() {
-  const modes = [["arena", "競技場"], ["mayhem", "ARAM Mayhem"]];
+  const modes = [["arena", "競技場"], ["mayhem", "ARAM Mayhem"], ["classic", "經典服"]];
   $("mech-modes").innerHTML = modes.map(([m, label]) =>
     `<button class="chip ${state.mechMode === m ? "active" : ""}" data-m="${m}">${label}</button>`).join("");
   for (const b of $("mech-modes").children)
@@ -820,16 +837,10 @@ function renderMech() {
 
 /* ---------------- ARAM 平衡表 ---------------- */
 async function loadAram() {
-  try {
-    const r = await fetch("/api/aram");
-    if (!r.ok) throw new Error((await r.json()).error || r.status);
-    state.aram = await r.json();
-    if (state.aram.stale) $("aram-stale").innerHTML = '<div class="stale">⚠️ 資料源更新失敗,顯示的是上次成功抓取的快取,可能過期。</div>';
-    $("aram-status").hidden = true;
+  await _fetchTab("aram", "/api/aram", (data) => {
+    state.aram = data;
     renderAram();
-  } catch (e) {
-    $("aram-status").textContent = "載入失敗:" + e.message;
-  }
+  }, "aram-status", "aram-stale");
 }
 // 欄位順序與呈現:mult 欄顯示 ±%,flat 欄顯示 ±N
 const ARAM_COLS = [

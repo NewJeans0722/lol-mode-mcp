@@ -202,6 +202,61 @@ src/lol_mode_mcp/
   ⚠️ 日後若官方再改 HTML 結構:重抓官網存 local HTML,跟存好的
   前版 diff tag 序列,再調 `_TOKEN_RE`。邏輯全在 `official_notes.py`
   `parse_official_notes`,不到 60 行。
+- **2026-07-16**(分頁切換 race condition 修復):
+  - 使用者回報:切換分頁(如競技場平衡 → ARAM 平衡)有時會卡住,
+    馬上切回去再重複一次操作就好——典型 race condition。
+  - **根因**:`showTab()` 發出的 async `load*()` 請求沒有 abort 機制,
+    快速切換時舊請求仍在飛行,可能覆蓋新請求的狀態或留下孤立的
+    render 呼叫;也沒有防止重複請求的 guard。冷啟動時尤其明顯
+    (第一個請求觸發伺服器暖機但 UI 已切走,第二個請求回來時
+    又因為 `!state.xxx` 重發,兩個請求互相競爭)。
+  - **修法**(`web/index.html`):
+    ① 新增 `_fetchTab(key, url, onOk, statusId, staleId)` 泛用載入器:
+    去重複(同 key 只發一個請求,後續呼叫共用 promise)、
+    AbortController(發新請求前取消舊的)、
+    AbortError 安靜略過(不顯示錯誤)。
+    ② `showTab()`:切換時取消所有非目標分頁的進行中請求;
+    aug tab 若 `state.augs` 為 null(被取消過)補發 `loadAugments()`。
+    ③ 所有 `load{Arena,Aram,Patch,Mech,Augments,MayhemAugs}` 改用
+    `_fetchTab`,程式碼大幅簡化(~30 行砍掉)。
+    ④ `loadPatch` 額外處理 scope/version 變更時先清舊 loading state。
+  - 驗收:111 tests;HTML 內 JS 括號平衡確認(219/219 大括號、510/510 小括號)。
+- **2026-07-16**(鍛體流數值修正 + 經典服新增):
+  - 使用者指出鍛體流數值可能是舊的。查證 LoL Wiki Arena/Patch history:
+    - **Shardholder Value 上限已從 80% 下調至 50%**(V25.24)。
+    - V26.09 新增道具 **Shardblade**（碎片之刃），被動 Endless Potential
+      再增幅屬性碎片，是鍛體流後期關鍵裝備。
+    - 官方另有 Fame Lv11 解鎖的稜彩強化 **Quest: Rite of the Forge God**
+      （鍛神儀式，買 2 裝備鐵砧→全部裝備 Masterwork +30%），
+      與社群鍛體流（Shardholder Value）是不同機制。
+    - 已更新 mode_mechanics.json 鍛體流節：補上正確英文名
+      Shardholder Value/Shardblade/Rite of the Forge God、
+      修正上限 50%（非 80%）、加 Shardblade 搭配說明。
+  - **經典服（League Classic）**:Riot 宣布 2026-07-29（V26.15）上線。
+    S3 基底、60 經典英雄（舊技能組）、舊裝備/符文/天賦、
+    獨立帳號體系。ARAM: Mayhem Classic-ish 同步上線（現代技能組 +
+    經典裝備/強化/地圖、限時獨立佇列）。
+    - mode_mechanics.json 新增 `classic` 頂層 key（3 節：概述/
+      Mayhem Classic-ish/與本專案關係）。
+    - mayhem 節補「ARAM: Mayhem Classic-ish」子節。
+    - mechanics.py 加 classic 別名（經典服/經典/懷舊服/懷舊）。
+    - web/index.html 機制分頁晶片加「經典服」。
+  - 驗收:111 tests;JSON 結構 4 mode 全有效;check_update.py 全綠。
+- **2026-07-16**(V26.14 補翻 + 鍛體流機制):
+  - **check_update.py 第 3 項**:V26.14 有 20 行 MapChanges 新改動
+    規則翻不出(伊莉絲/漢默丁格/伊羅旖/慨影/克雷德/易大師/葵恩/
+    史加納/斯溫/塔隆/約瑞科/婕莉/柔依),已人工翻譯補進
+    `data/mapchanges_zh.json`,**20/20 全數到位**。
+    ⚠️ 踩坑:克雷德 "*Frayed Nerves* duration..." key 帶 `*`,但
+    translate.py `translate_line` 查表前會 strip `*`/`**`,
+    key 不能帶星號 → 改為 `Frayed Nerves duration...`。
+  - **mode_mechanics.json**:補「鍛體流／鍛鐵流（不買裝備的隱藏
+    彩蛋玩法）」章節。這是一個社群發現的隱藏機制:全程不買裝備、
+    只買能力值鐵砧累積 10+ 屬性碎片後,商店有機率出現「征服碎片」
+    特殊選項(所有鐵砧屬性 ×20%–80%);一旦買了裝備就永遠不觸發。
+    適合趙信/泰達米爾/易大師等靠屬性數值的英雄。
+    來源:PTT/BaHa/遊戲狂等多篇中文攻略(英文 wiki 無此條目,
+    屬社群自行發現的非官方玩法)。meta 日戳更新至 2026-07-16。
 - **2026-07-13**(網域 zhongqqq.win + Cloudflare + 架站 SOP):
   見 `DOMAIN_SETUP.md`。Cloudflare Registrar 買網域、DNS 加 CNAME、
   先灰雲後橘雲、SSL Full、UptimeRobot 防休眠。

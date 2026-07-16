@@ -22,6 +22,8 @@ _MODE_ALIASES = {
     "aram": "aram", "嚎哭深淵": "aram", "深淵": "aram",
     "mayhem": "mayhem", "大混戰": "mayhem", "aram: mayhem": "mayhem",
     "aram_mayhem": "mayhem", "kiwi": "mayhem",
+    "classic": "classic", "經典服": "classic", "經典": "classic",
+    "懷舊服": "classic", "懷舊": "classic",
 }
 
 
@@ -45,7 +47,7 @@ def do_mode_mechanics(mode: str = "arena") -> str:
     data = load_mechanics()
     if key is None or key not in data:
         return ("看不懂模式「%s」。可查:arena(競技場)、aram(嚎哭深淵)、"
-                "mayhem(ARAM: Mayhem)。" % mode)
+                "mayhem(ARAM: Mayhem)、classic(經典服)。" % mode)
     section = data[key]
     lines = [f"{section['name_zh']} — 模式機制"]
     for sec in section["sections"]:
