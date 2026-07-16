@@ -1,7 +1,0 @@
-{
-  "_meta": {
-    "description": "需要翻轉的原畫清單(人物靠左，右側面板需翻轉)。key = ChampionId_SkinNum。",
-    "last_updated": "2026-07-16"
-  },
-  "flip": ["Zoe_22", "Briar_20"]
-}
