@@ -81,11 +81,15 @@
   body.light #bg::after {
     background: linear-gradient(180deg, rgba(243,241,234,.45) 0%, rgba(243,241,234,.3) 40%, rgba(243,241,234,.6) 100%);
   }
-  /* 左側展示欄:水平翻轉讓角色面向內容區,避免被遮罩蓋掉 */
+  /* 左側展示欄:水平翻轉與否由 JS 根據人物靠左/靠右動態決定 */
   #bg-left {
     position: fixed; top: 0; left: 0; bottom: 0; z-index: -3;
     width: min(48vw, 920px); pointer-events: none;
     background-size: cover; background-position: center 22%;
+    -webkit-mask-image: linear-gradient(to right, rgba(0,0,0,.95) 42%, transparent 97%);
+    mask-image: linear-gradient(to right, rgba(0,0,0,.95) 42%, transparent 97%);
+  }
+  #bg-left.flip {
     transform: scaleX(-1);
     -webkit-mask-image: linear-gradient(to left, rgba(0,0,0,.95) 42%, transparent 97%);
     mask-image: linear-gradient(to left, rgba(0,0,0,.95) 42%, transparent 97%);
@@ -523,22 +527,28 @@ function setBg(side, v) {
   v = v || "";
   $(cfg.sel).value = v;
   let url = "";
+  let bodySide = "right";  // 預設:人物靠右
   if (v) {
     const [cid, num] = v.split("_");
     const c = (state.bgs || []).find((x) => x.id === cid);
     const s = c && c.skins.find((x) => String(x.num) === num);
-    if (s) url = s.url;
+    if (s) { url = s.url; bodySide = s.bodySide || "right"; }
   }
   $(cfg.el).style.backgroundImage = url ? `url("${url}")` : "";
+  // 人物靠哪邊≠面板靠哪邊時要翻轉
+  const needFlip = bodySide !== side;
+  $(cfg.el).classList.toggle("flip", url && needFlip);
   try { localStorage.setItem(cfg.store, v); } catch (e) {}
-}
 async function initBg() {
   try {
     const r = await fetch("/api/backgrounds");
     if (!r.ok) return;
     state.bgs = (await r.json()).champions;
     const groups = state.bgs.map((c) => `<optgroup label="${esc(c.name)}">` +
-      c.skins.map((s) => `<option value="${c.id}_${s.num}">${esc(s.name)}</option>`).join("") +
+      c.skins.map((s) => {
+        const arrow = s.bodySide === "left" ? " ◀" : "";
+        return `<option value="${c.id}_${s.num}">${esc(s.name)}${arrow}</option>`;
+      }).join("") +
       "</optgroup>").join("");
     for (const [side, cfg] of Object.entries(BG_SIDES)) {
       const label = side === "left" ? "左景:無" : "右景:無";

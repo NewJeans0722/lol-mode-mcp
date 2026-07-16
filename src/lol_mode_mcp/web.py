@@ -376,6 +376,13 @@ def _backgrounds_payload() -> dict:
     import httpx
 
     from .http_util import fetch_json
+    # 人物靠左/靠右對照(預設靠右)
+    facing_path = Path(__file__).resolve().parent / "data" / "splash_facing.json"
+    try:
+        facing_data = json.loads(facing_path.read_text(encoding="utf-8"))
+        facing_map = facing_data.get("facing", {})
+    except (OSError, json.JSONDecodeError):
+        facing_map = {}
     ver = fetch_json(_VERSIONS_URL)[0]
     champions = []
     with httpx.Client(timeout=10) as client:
@@ -390,7 +397,10 @@ def _backgrounds_payload() -> dict:
                 except httpx.HTTPError:
                     continue
                 name = "經典原畫" if s["name"] == "default" else s["name"]
-                skins.append({"num": s["num"], "name": name, "url": url})
+                key = f"{cid}_{s['num']}"
+                body_side = facing_map.get(key, "right")  # 預設靠右
+                skins.append({"num": s["num"], "name": name, "url": url,
+                               "bodySide": body_side})
             champions.append({"id": cid, "name": data["name"], "skins": skins})
     logger.info("backgrounds loaded: %s",
                 {c["id"]: len(c["skins"]) for c in champions})
