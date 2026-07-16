@@ -65,19 +65,18 @@
     opacity: .04;
   }
   body.light::before { opacity: .07; }
-  /* 官方原畫背景:右側「主角展示」——原畫主體(通常在圖中央)
-     落在右側邊欄,往左淡出到內容區底下,人物不會被內容擋住 */
+  /* 背景原畫:錨定外側邊緣 + 60% 可視區,人物自然落在可見範圍 */
   #bg {
     position: fixed; top: 0; right: 0; bottom: 0; z-index: -3;
     width: min(48vw, 920px); pointer-events: none;
-    background-size: cover; background-position-y: 22%;
-    -webkit-mask-image: linear-gradient(to left, rgba(0,0,0,.95) 42%, transparent 97%);
-    mask-image: linear-gradient(to left, rgba(0,0,0,.95) 42%, transparent 97%);
+    background-size: cover; background-position: right 22%;
+    -webkit-mask-image: linear-gradient(to left, rgba(0,0,0,.95) 60%, transparent 92%);
+    mask-image: linear-gradient(to left, rgba(0,0,0,.95) 60%, transparent 92%);
   }
   #bg.flip {
     transform: scaleX(-1);
-    -webkit-mask-image: linear-gradient(to right, rgba(0,0,0,.95) 42%, transparent 97%);
-    mask-image: linear-gradient(to right, rgba(0,0,0,.95) 42%, transparent 97%);
+    -webkit-mask-image: linear-gradient(to right, rgba(0,0,0,.95) 60%, transparent 92%);
+    mask-image: linear-gradient(to right, rgba(0,0,0,.95) 60%, transparent 92%);
   }
   #bg::after {  /* 輕薄遮罩:右側文字(計數等)仍可讀,但不蓋掉人物 */
     content: ""; position: absolute; inset: 0;
@@ -86,18 +85,17 @@
   body.light #bg::after {
     background: linear-gradient(180deg, rgba(243,241,234,.45) 0%, rgba(243,241,234,.3) 40%, rgba(243,241,234,.6) 100%);
   }
-  /* 左側展示欄:水平翻轉與否由 JS 根據人物靠左/靠右動態決定 */
   #bg-left {
     position: fixed; top: 0; left: 0; bottom: 0; z-index: -3;
     width: min(48vw, 920px); pointer-events: none;
-    background-size: cover; background-position-y: 22%;
-    -webkit-mask-image: linear-gradient(to right, rgba(0,0,0,.95) 42%, transparent 97%);
-    mask-image: linear-gradient(to right, rgba(0,0,0,.95) 42%, transparent 97%);
+    background-size: cover; background-position: left 22%;
+    -webkit-mask-image: linear-gradient(to right, rgba(0,0,0,.95) 60%, transparent 92%);
+    mask-image: linear-gradient(to right, rgba(0,0,0,.95) 60%, transparent 92%);
   }
   #bg-left.flip {
     transform: scaleX(-1);
-    -webkit-mask-image: linear-gradient(to left, rgba(0,0,0,.95) 42%, transparent 97%);
-    mask-image: linear-gradient(to left, rgba(0,0,0,.95) 42%, transparent 97%);
+    -webkit-mask-image: linear-gradient(to left, rgba(0,0,0,.95) 60%, transparent 92%);
+    mask-image: linear-gradient(to left, rgba(0,0,0,.95) 60%, transparent 92%);
   }
   #bg-left::after {
     content: ""; position: absolute; inset: 0;
@@ -110,7 +108,7 @@
   @media (max-width: 1100px) {
     #bg-left { display: none; }
     #bg {
-      width: 100vw; background-position-x: 50% !important;
+      width: 100vw; background-position: center 22% !important;
       -webkit-mask-image: none; mask-image: none;
     }
     #bg::after {
