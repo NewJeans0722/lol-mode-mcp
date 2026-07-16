@@ -81,13 +81,14 @@
   body.light #bg::after {
     background: linear-gradient(180deg, rgba(243,241,234,.45) 0%, rgba(243,241,234,.3) 40%, rgba(243,241,234,.6) 100%);
   }
-  /* 左側展示欄(鏡像) */
+  /* 左側展示欄:水平翻轉讓角色面向內容區,避免被遮罩蓋掉 */
   #bg-left {
     position: fixed; top: 0; left: 0; bottom: 0; z-index: -3;
     width: min(48vw, 920px); pointer-events: none;
     background-size: cover; background-position: center 22%;
-    -webkit-mask-image: linear-gradient(to right, rgba(0,0,0,.95) 42%, transparent 97%);
-    mask-image: linear-gradient(to right, rgba(0,0,0,.95) 42%, transparent 97%);
+    transform: scaleX(-1);
+    -webkit-mask-image: linear-gradient(to left, rgba(0,0,0,.95) 42%, transparent 97%);
+    mask-image: linear-gradient(to left, rgba(0,0,0,.95) 42%, transparent 97%);
   }
   #bg-left::after {
     content: ""; position: absolute; inset: 0;
