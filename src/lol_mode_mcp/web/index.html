@@ -218,6 +218,13 @@
   }
   .badge.special { color: var(--special); border-color: var(--special); }
   .badge.star { color: var(--gold-bright); border-color: var(--gold); }
+  /* 強化卡片:top5 英雄頭像列 */
+  .hrow-title{font-size:11px;color:var(--muted);margin-top:10px;padding-top:8px;border-top:1px solid var(--line)}
+  .hrow{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px}
+  .hchip{display:inline-flex;flex-direction:column;align-items:center;gap:2px;width:40px}
+  .hchip img{width:32px;height:32px;border-radius:6px;background:var(--panel-2)}
+  .hchip-pct{font-size:10.5px;font-weight:600;font-variant-numeric:tabular-nums}
+  .hchip-pct.up{color:var(--buff)}.hchip-pct.down{color:var(--nerf)}.hchip-pct.mid{color:var(--muted)}
 
   /* ---- ARAM 表 ---- */
   .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 2px; }
@@ -338,6 +345,7 @@
     <button id="tab-aram">ARAM 平衡</button>
     <button id="tab-patch">Patch 改動</button>
     <button id="tab-mech">機制</button>
+    <button id="tab-stats" hidden>統計</button>
     <div class="langs">
       <button id="lang-zh" class="active">中</button>
       <button id="lang-en">EN</button>
@@ -412,6 +420,17 @@
     <div class="table-wrap"><table id="aram-table"></table></div>
     <div class="status" id="aram-status">切到此分頁時載入…</div>
   </section>
+
+  <!-- 競技場實戰統計 -->
+  <section id="page-stats" hidden>
+    <div class="toolbar">
+      <div class="chips" id="stats-mode"></div>
+      <span class="count" id="stats-count"></span>
+    </div>
+    <div id="stats-meta"></div>
+    <div id="stats-content"></div>
+    <div class="status" id="stats-status">切到此分頁時載入…</div>
+  </section>
 </main>
 
 <footer>
@@ -472,7 +491,7 @@ async function _fetchTab(key, url, onOk, statusId, staleId) {
   return promise;
 }
 
-const TABS = ["aug", "arena", "aram", "patch", "mech"];
+const TABS = ["aug", "arena", "aram", "patch", "mech", "stats"];
 function showTab(which) {
   for (const t of TABS) {
     $("page-" + t).hidden = t !== which;
@@ -490,6 +509,7 @@ function showTab(which) {
   if (which === "arena" && !state.arena) loadArena();
   if (which === "patch" && !state.patch) loadPatch("latest");
   if (which === "mech" && !state.mech) loadMech();
+  if (which === "stats" && !state.stats) loadStats();
 }
 for (const t of TABS) $("tab-" + t).onclick = () => showTab(t);
 
@@ -673,9 +693,27 @@ function renderAugs() {
         <div class="en">${esc(zh ? a.nameEn : a.nameZh)}</div>
         <div class="desc">${richText(zh ? descZh : descEn)}</div>
       </div>
+      ${heroRow(a)}
     </div>`;
   }).join("");
 }
+function heroRow(a) {
+  // arena 分頁 + 有統計資料時,卡片底部顯示 top5 英雄頭像
+  if (state.augMode !== "arena" || !state.stats || !state.stats.topHeroes) return "";
+  const top5 = state.stats.topHeroes[a.nameEn];
+  if (!top5 || !top5.length) return "";
+  const base = (state.stats.meta && state.stats.meta.baselineFirstRate) || 0.167;
+  const fn = v => (v > base ? "up" : (v < base - 0.02 ? "down" : "mid"));
+  return `<div class="hrow-title">👥 最常選取(勝率)</div><div class="hrow">` +
+    top5.map(h =>
+      `<span class="hchip" title="${esc(h.nameZh)}: ${(h.firstRate*100).toFixed(1)}%">
+        ${h.icon ? `<img src="${h.icon}" alt="" loading="lazy">` : ""}
+        <span class="hchip-pct ${fn(h.firstRate)}">${(h.firstRate*100).toFixed(0)}%</span>
+      </span>`).join("") + "</div>";
+}
+// refresh aug cards when stats load (top5 hero icons appear)
+function _renderAugCards() { if (state.augs) { renderAugModes(); renderChips(); renderAugs(); } }
+
 $("aug-q").oninput = (e) => { state.augQ = e.target.value; renderAugs(); };
 
 /* ---------------- 競技場平衡 ---------------- */
@@ -918,7 +956,74 @@ function renderAram() {
 $("aram-q").oninput = (e) => { state.aramQ = e.target.value; renderAram(); };
 $("aram-only").onchange = () => renderAram();
 
-loadAugments();
+/* ---------------- 競技場實戰統計 ---------------- */
+state.statsMode = "augments";
+async function loadStats() {
+  await _fetchTab("stats", "/api/arena-stats", (data) => {
+    state.stats = data;
+    if (data.available) {
+      $("tab-stats").hidden = false;
+      // 用基準值當全體對照
+      const m = data.meta;
+      const bw = (m.baselineFirstRate || 0.167) * 100;
+      $("stats-meta").innerHTML = '<div class="note" style="margin:0 0 14px;padding:9px 14px;background:var(--panel-2);border-left:3px solid var(--gold);font-size:13px;color:var(--muted)">' +
+        '<b style="color:var(--gold-bright)">V26.' + Object.keys(m.patches)[0].split(".")[1] + '</b> · ' +
+        m.matches + ' 場台服現行競技場(6隊×3人) · 基準勝率 ' + bw.toFixed(1) + '% · 產生於 ' + m.generated_at +
+        ' · <b>雪球取樣非全服統計,同組合<' + m.min_pair + '場不收錄</b></div>';
+    }
+    if (state.augs) _renderAugCards();  // 強化卡片出現頭像列
+    renderStats();
+  }, "stats-status");
+}
+function renderStats() {
+  if (!state.stats || !state.stats.available) return;
+  const isAug = state.statsMode === "augments";
+  const list = (isAug ? state.stats.augments : state.stats.champions)
+    .filter(e => !e.lowSample);
+  $("stats-count").textContent = '顯示 ' + list.length + ' 個';
+  const baseW = state.stats.meta.baselineFirstRate || 0.167;
+  const RAR = {0:["白銀","silver"],1:["黃金","gold"],2:["稜彩","prismatic"]};
+  // 模式切換 chips
+  $("stats-mode").innerHTML = [
+    ["augments","強化勝率"],["champions","英雄勝率"]
+  ].map(([v,label]) =>
+    `<button class="chip ${state.statsMode===v?'active':''}" data-s="${v}">${label}</button>`
+  ).join("");
+  for (const b of $("stats-mode").children) b.onclick = () => {
+    state.statsMode = b.dataset.s; renderStats();
+  };
+  const top = Math.min(list.length, 30);
+  let rows = '';
+  for (let i = 0; i < top; i++) {
+    const e = list[i];
+    const up = e.firstRate > baseW + 0.02;
+    const dn = e.firstRate < baseW - 0.02;
+    const wr = `<span style="color:${up?'var(--buff)':dn?'var(--nerf)':'var(--text)'};font-weight:600">${(e.firstRate*100).toFixed(1)}%</span>`;
+    if (isAug) {
+      const [tz,tc] = RAR[e.rarity]||["未知",""];
+      rows += `<tr>
+        <td>${e.icon ? `<img src="${e.icon}" alt="" style="width:28px;height:28px;border-radius:4px;vertical-align:middle;margin-right:6px">` : ""}${esc(e.nameZh)}<small style="color:var(--muted);margin-left:4px">${esc(e.nameEn)}</small></td>
+        <td><span class="badge ${tc||""}">${esc(tz)}</span></td>
+        <td class="num">${e.games}</td><td class="num">${wr}</td>
+        <td class="num">${(e.top2Rate*100).toFixed(1)}%</td>
+        <td class="num">${e.avgPlace.toFixed(2)}</td>
+      </tr>`;
+    } else {
+      rows += `<tr>
+        <td class="champ">${e.icon ? `<img src="${e.icon}" alt="" loading="lazy">` : ""}${esc(e.nameZh)}<span class="en">${esc(e.nameEn)}</span></td>
+        <td class="num">${e.games}</td><td class="num">${wr}</td>
+        <td class="num">${(e.top2Rate*100).toFixed(1)}%</td>
+        <td class="num">${e.avgPlace.toFixed(2)}</td>
+      </tr>`;
+    }
+  }
+  const cols = isAug
+    ? '<tr><th>強化</th><th>稀有度</th><th class="num">場次</th><th class="num">勝率</th><th class="num">前二率</th><th class="num">平均名次</th></tr>'
+    : '<tr><th>英雄</th><th class="num">場次</th><th class="num">勝率</th><th class="num">前二率</th><th class="num">平均名次</th></tr>';
+  $("stats-content").innerHTML = '<div class="table-wrap"><table>' + cols + rows + '</table></div>';
+}
+
+loadAugments(); loadStats();
 </script>
 </body>
 </html>

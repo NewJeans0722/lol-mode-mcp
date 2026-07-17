@@ -29,6 +29,7 @@ from .mayhem_augments import (do_get_mayhem_augment, do_list_mayhem_augments,
                               do_mayhem_balance)
 from .arena import do_get_augment, do_list_augments
 from .arena_balance import do_arena_balance
+from .arena_stats import do_arena_stats
 from .mechanics import do_mode_mechanics
 from .patch_notes import do_patch_notes
 
@@ -98,6 +99,22 @@ def list_augments(tier: str = "all", locale: str = "zh_tw",
     if mode.strip().lower() in _MAYHEM_MODES:
         return do_list_mayhem_augments(tier, locale)
     return do_list_augments(tier, locale)
+
+
+@mcp.tool()
+def arena_stats(query: str = "", kind: str = "auto") -> str:
+    """競技場實戰統計(Riot Match-V5 真實對戰):強化適合哪些英雄、英雄名次排行。
+
+    資料來自本機爬取的台服場次(雪球取樣,非全服統計),回覆會標明
+    樣本數與門檻;統計檔尚未產生時會回覆產生步驟。
+
+    Args:
+        query: 強化名或英雄名,中英文皆可(例:「地獄三頭犬」、「蓋倫」、Garen);
+               留空看排行榜。
+        kind: "auto"(預設,自動判斷)/ "champions" 英雄排行 / "augments" 強化排行。
+    """
+    logger.info("tool arena_stats(query=%r, kind=%r)", query, kind)
+    return do_arena_stats(query, kind)
 
 
 @mcp.tool()
@@ -209,7 +226,7 @@ def mode_mechanics() -> str:
 # ---------------------------------------------------------------- 網頁介面
 # 同一個 HTTP server 順便掛查詢網頁(給人用)與 JSON API(給網頁的 JS 用);
 # MCP 客戶端仍走 /mcp,互不干擾。stdio 模式下這些路由不存在。
-from .web import (api_aram, api_arena_balance, api_augments,  # noqa: E402
+from .web import (api_aram, api_arena_balance, api_arena_stats, api_augments,  # noqa: E402
                   api_backgrounds, api_mayhem_augments, api_mechanics,
                   api_patch_notes, home)
 
@@ -221,6 +238,7 @@ mcp.custom_route("/api/patch-notes", methods=["GET"])(api_patch_notes)
 mcp.custom_route("/api/backgrounds", methods=["GET"])(api_backgrounds)
 mcp.custom_route("/api/mayhem-augments", methods=["GET"])(api_mayhem_augments)
 mcp.custom_route("/api/mechanics", methods=["GET"])(api_mechanics)
+mcp.custom_route("/api/arena-stats", methods=["GET"])(api_arena_stats)
 
 
 def main() -> None:

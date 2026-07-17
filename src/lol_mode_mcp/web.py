@@ -418,6 +418,85 @@ async def api_backgrounds(request: Request) -> Response:
                         ttl=12 * 3600)
 
 
+# ------------------------------------------------------- 競技場統計
+# 資料來自本機爬取的 Riot Match-V5 真實對戰(雪球取樣),靜態檔部署,
+# 不需要 API key。檔案不存在時回傳空,前端自己隱藏統計分頁。
+
+_STATS_PATH = Path(__file__).resolve().parent / "data" / "arena_stats.json"
+
+
+def _arena_stats_payload() -> dict:
+    from .champions import get_champions
+    from .arena import get_arena_data
+    try:
+        stats = json.loads(_STATS_PATH.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {"available": False}
+    # 英雄頭像:統計裡的 championName(如 MonkeyKing) = ddragon id
+    try:
+        icons = {c.id: c.icon_url for c in get_champions().data}
+    except Exception:
+        icons = {}
+    # 強化圖示(CommunityDragon)
+    try:
+        aug_icons = {str(a.id): a.icon_url for a in get_arena_data().data.augments}
+    except Exception:
+        aug_icons = {}
+    # 只傳前端需要的欄位:強化勝率排行 + 每卡片 top5 英雄
+    augs = []
+    for aid, a in stats["augments"].items():
+        if a.get("rarity") == 4:  # 特殊類(鐵砧/欄位)跳過
+            continue
+        tc = a.get("topChamps", [])
+        top5 = [{"champ": t["champ"], "nameZh": t["champZh"],
+                 "games": t["games"],
+                 "firstRate": round(t.get("firstRate", 0), 3),
+                 "icon": icons.get(t["champ"], "")}
+                for t in tc[:5]]
+        augs.append({
+            "id": aid,
+            "nameZh": a["nameZh"], "nameEn": a["nameEn"],
+            "icon": aug_icons.get(aid, ""),
+            "rarity": a.get("rarity", -1),
+            "games": a["games"],
+            "avgPlace": a["avgPlace"],
+            "firstRate": a.get("firstRate", 0),
+            "top2Rate": a["top2Rate"],
+            "lowSample": a.get("lowSample", False),
+            "topChamps": top5,
+        })
+    augs.sort(key=lambda x: (-x.get("firstRate", 0), -x["top2Rate"], -x["games"]))
+    # champions sorted by win rate
+    champs = []
+    for cid, c in stats["champions"].items():
+        ta = c.get("topAugments", [])
+        top5 = [{"id": t["id"], "nameZh": t["nameZh"],
+                 "games": t["games"],
+                 "firstRate": round(t.get("firstRate", 0), 3)}
+                for t in ta[:5]]
+        champs.append({
+            "id": cid, "nameZh": c["nameZh"], "nameEn": c["nameEn"],
+            "games": c["games"], "avgPlace": c["avgPlace"],
+            "firstRate": c.get("firstRate", 0), "top2Rate": c["top2Rate"],
+            "lowSample": c.get("lowSample", False),
+            "icon": icons.get(cid, ""),
+            "topAugments": top5,
+        })
+    champs.sort(key=lambda x: (-x.get("firstRate", 0), -x["top2Rate"], -x["games"]))
+    return {
+        "available": True,
+        "meta": stats["meta"],
+        "augments": augs,
+        "champions": champs,
+        # per-augment top5 英雄索引(key=augment nameEn,供圖鑑卡片快速查)
+        "topHeroes": {a["nameEn"]: a["topChamps"] for a in augs},
+    }
+
+
+async def api_arena_stats(request: Request) -> Response:
+    return _cached_json(request, "api_arena_stats", _arena_stats_payload)
+
+
 def warmup() -> None:
     """啟動時在背景把資料源與 API payload 都先算好,訪客不用等。"""
     builders = [("api_augments", _augments_payload),
@@ -431,7 +510,8 @@ def warmup() -> None:
                  lambda: _patch_notes_payload("latest", "mayhem")),
                 ("api_backgrounds", _backgrounds_payload),
                 ("api_mayhem_augments", _mayhem_augments_payload),
-                ("api_mechanics", _mechanics_payload)]
+                ("api_mechanics", _mechanics_payload),
+                ("api_arena_stats", _arena_stats_payload)]
     for key, builder in builders:
         try:
             cache.get_cached(key, builder)

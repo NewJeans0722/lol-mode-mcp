@@ -190,9 +190,69 @@ src/lol_mode_mcp/
    GitHub repo 網址(http_util.py 的 User-Agent 裡也有佔位)要補。
 4. 可考慮:mayhem 資料源(wiki 是否新增 mayhem 模組)、
    list_augments 加英文 locale 的標題在地化(目前少量中文字樣寫死)。
+5. **競技場統計整合進 lol.zhongqqq.win**(使用者 2026-07-17 指示:
+   之後要做,目前先不用):arena_stats.json 是靜態檔已隨套件部署,
+   做法 = web.py 加 /api/arena-stats + index.html 加分頁即可,免 API key。
+   使用者要的欄位:勝率(第1名率)排行、每強化的英雄選取率。
 
 ## 日誌
 
+- **2026-07-17**(Riot API 競技場實戰統計:「強化適合誰」上線):
+  使用者申請到 Riot API dev key,要 OP.GG 式統計——強化適合哪些英雄、
+  英雄名次排行。**三段式管線,只有第一段需要 key**:
+  `scripts/crawl_arena.py`(爬,JSONL)→ `scripts/build_arena_stats.py`
+  (聚合)→ `data/arena_stats.json` + tool `arena_stats`(唯讀免 key,
+  Render 部署不受影響)。核心邏輯在 `arena_stats.py`(+15 tests)。
+  - **Riot API 事實(查證過,別再查)**:dev key 每 24h 過期、
+    developer portal 可每日免費 Regenerate;限速 20 req/s + 100 req/2min;
+    台服 TW2:帳號查詢(Account-V1)走 `asia`、對戰(Match-V5)走 `sea`;
+    participant 有 placement/playerAugment1~6
+    (數字 id = cdragon arena json 的 augment id,直接接既有中文索引)。
+    **長期解法:申請 Personal API Key(不過期)**。
+  - 🔎 **重大發現(實爬踩到):現行競技場是 queue 1750,不是文件上的
+    1700**。1700(16 人/8 隊×2 人)最後一場停在 V26.9(gameVersion 16.9);
+    V26.10 起改 **1750:18 人/6 隊×3 人、名次 1~6、gameMode 仍是 CHERRY**
+    (實測種子帳號 16.13/16.14 場次的名次分布確認:每名次 3 人)。
+    靜態 queues.json 沒收 1750。
+    → 隊制與基準值都不能寫死:trim_match 由名次分布驗證+推導隊數
+    (每名次人數相同、名次連續),aggregate 動態算基準
+    (8 隊 = 4.5/25%、6 隊 = 3.5/33.3%,存 meta.baselineAvgPlace/Top2Rate),
+    builder 預設只統計 1750(`--queue` 可切),新舊制平衡不同不可混。
+  - ⚠️ **踩坑(變數撞名)**:crawl() 的 queue id 參數被函式內
+    `queue: deque` 蓋掉,整個 deque 被當 HTTP query 參數送出
+    → httpx "URL component 'query' too long"。佇列改名 todo。
+  - 🔎 **新制競技場的新強化不在 cdragon arena json(226 筆)裡**
+    (實爬 539 場出現 53 個未知 id,如 1413 隨我同困/2010 雙重命中)。
+    **cherry-augments.json(624 筆)其實是強化總目錄**,不只 Mayhem
+    (修正 2026-07-09 的舊認知「Mayhem 專用」):id + nameTRA + rarity
+    (kSilver/kGold/kPrismatic)都有 → builder 的
+    `fill_missing_from_cherry` 補名,53/53 全數命中。
+  - ⚠️ **ARAM Mayhem(queue 2400)被 Riot 官方封鎖**:Match-V5 查
+    Mayhem 場次直接 403(developer-relations issue #1109/#1154),
+    連 aramstats.lol 都拿不到 → Mayhem 強化統計目前不可能,
+    等 Riot 開放再補。一般 ARAM(450)查得到但沒有強化。
+  - **關鍵決定與理由**:
+    ① 儲存用 JSONL 不用 SQLite:append-only、壞行只丟一行、
+    續跑=掃 matchId 進 set;2500 場才 3~5MB,SQLite 是過度工程。
+    ② 限速用固定 1.3s 間隔(≈92 req/2min):100/2min 是主宰限制,
+    一行 sleep 兩條限制都不會踩;429 仍讀 Retry-After 防禦。
+    ③ 樣本門檻:配對 <10 場直接不收錄(寧缺勿誤導)、整體 <30 場標
+    「⚠️ 樣本不足」;輸出必附「雪球取樣自個人對戰圈,非全服統計」
+    聲明與全體基準(平均名次 4.50/前二率 25%)。
+    ④ 開新 tool `arena_stats` 而非塞進 get_augment:統計和效果說明
+    語意不同;get_augment 只加一行導流(`arena.py _stats_hint`)。
+    ⑤ 統計 patch ≠ 現行 patch 時輸出 stale 警告(建議重爬)。
+  - **秘密管理**:key 放根目錄 `.env`(RIOT_API_KEY=RGAPI-...),
+    `.gitignore` 加了 `.env` 與 `crawl_data/`。key 過期時爬蟲印
+    regenerate 指引後乾淨退出,重跑自動續抓。
+  - **builder 自檢不變量**:全體平均名次必 ≈4.5、前二率必 =0.25
+    (名次 1~8 均勻),偏離即資料有 bug,build script 會自動檢查。
+  - ⚠️ **踩坑(續跑雪球死路)**:第一版續跑只載入已抓 matchId,
+    但玩家 PUUID 只從「新抓的場次」進佇列 → 種子的場次全抓過後,
+    重跑時佇列永遠長不大,0 秒結束。修法:`load_progress` 連同
+    JSONL 裡所有 participants 的 PUUID 一起載入佇列。
+  - 使用日常:`uv run python scripts/crawl_arena.py "名字#TW2"` →
+    `uv run python scripts/build_arena_stats.py`(可 `--patch 26.14`)。
 - **2026-07-14**(V26.14「黏在一起」bug + 官方 HTML 格式變遷):
   V26.14 起 Riot 官方繁中 patch notes 的競技場英雄條目名
   從 `<p><strong>名稱</strong></p>` 改為 `<p>名稱</p>`(不加粗)。

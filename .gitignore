@@ -18,3 +18,7 @@ Thumbs.db
 
 # 本地開發者筆記(不公開)
 README.dev.md
+
+# Riot API key 與爬蟲原始資料(絕不進 git)
+.env
+crawl_data/
