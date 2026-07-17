@@ -218,6 +218,19 @@ def _mayhem_twin_hint(aug: Augment) -> str:
     return ""
 
 
+def _stats_hint(aug: Augment) -> str:
+    """本機有這個強化的實戰統計時,提示可用 arena_stats 查適合英雄。"""
+    try:
+        from .arena_stats import load_stats  # 延遲匯入避免循環
+        stats = load_stats()
+        if stats and str(aug.id) in stats.get("augments", {}):
+            return ("📊 本機有這個強化的實戰統計(適合英雄/平均名次),"
+                    "可用 arena_stats 工具查。")
+    except Exception:
+        pass
+    return ""
+
+
 def do_get_augment(query: str, locale: str = "zh_tw") -> str:
     locale = locale.lower()
     if locale not in SUPPORTED_LOCALES:
@@ -246,6 +259,9 @@ def do_get_augment(query: str, locale: str = "zh_tw") -> str:
         hint = _mayhem_twin_hint(best)
         if hint:
             out.append("\n" + hint)
+        stats_hint = _stats_hint(best)
+        if stats_hint:
+            out.append("\n" + stats_hint)
         out.append("")
         out.append(_source_line(result, data.patch, locale))
         return "\n".join(out)
