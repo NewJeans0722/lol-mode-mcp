@@ -197,6 +197,29 @@ src/lol_mode_mcp/
 
 ## 日誌
 
+- **2026-07-18**(競技場統計網站整合 → 當天下架,勝率定義待重做):
+  把統計分頁 + 強化卡片 top5 英雄頭像整合進 lol.zhongqqq.win
+  (web.py `_arena_stats_payload` + `/api/arena-stats` + index.html 統計分頁),
+  但使用者一看數字「完全跟台服不一樣」,要求先下架。
+  - **下架方式(commit 8ee4e38)**:server.py 註解掉 `/api/arena-stats`
+    路由 + 移除 import;index.html 移除 統計 tab、TABS 的 "stats"、
+    showTab 的 stats 分支、卡片 `heroRow(a)` 呼叫、`loadStats()` 啟動。
+    **後端全部保留**(web.py payload/warmup、arena_stats.py、爬蟲、
+    MCP tool、arena_stats.json 資料檔),修好重新掛路由即可復原。
+  - **為什麼看起來不對(診斷,非程式 bug)**:
+    ① **先天**:雪球取樣自 bjbjc 一個帳號的對戰圈(同一 MMR 段),
+    非全服;op.gg 是全服幾百萬場 → 強勢強化排名本來就不同,
+    個人 dev key 無法變全服。
+    ② **勝率定義差 3 倍**:我把「勝率」定成「第 1 名率」(6 隊基準
+    16.7%),但台服/op.gg 的「勝率」通常是「打進前段班/前 3 名」
+    (基準 ~50%)→ 數字差快 3 倍,看起來全錯。
+    ③ **排序雜訊**:排行榜用勝率排 + 門檻只有 30 場 → 42 場的
+    「巨龍威能」靠運氣排第 1;真正好的「質變:大混亂」(511 場、
+    平均名次 2.40)被擠到第 3。
+  - **重新上線前要改(TODO)**:勝率改「前段班率」(place ≤ 隊數//2,
+    基準 0.5,aggregate 動態算)、排行榜改用平均名次排序 +
+    樣本門檻拉到 ~100 場、頁面清楚標注各指標定義與「非全服」聲明。
+    詳見計畫檔 riot-api-api-shimmering-pizza.md。
 - **2026-07-17**(Riot API 競技場實戰統計:「強化適合誰」上線):
   使用者申請到 Riot API dev key,要 OP.GG 式統計——強化適合哪些英雄、
   英雄名次排行。**三段式管線,只有第一段需要 key**:
