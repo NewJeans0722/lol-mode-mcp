@@ -226,7 +226,7 @@ def mode_mechanics() -> str:
 # ---------------------------------------------------------------- 網頁介面
 # 同一個 HTTP server 順便掛查詢網頁(給人用)與 JSON API(給網頁的 JS 用);
 # MCP 客戶端仍走 /mcp,互不干擾。stdio 模式下這些路由不存在。
-from .web import (api_aram, api_arena_balance, api_arena_stats, api_augments,  # noqa: E402
+from .web import (api_aram, api_arena_balance, api_augments,  # noqa: E402
                   api_backgrounds, api_mayhem_augments, api_mechanics,
                   api_patch_notes, home)
 
@@ -238,7 +238,9 @@ mcp.custom_route("/api/patch-notes", methods=["GET"])(api_patch_notes)
 mcp.custom_route("/api/backgrounds", methods=["GET"])(api_backgrounds)
 mcp.custom_route("/api/mayhem-augments", methods=["GET"])(api_mayhem_augments)
 mcp.custom_route("/api/mechanics", methods=["GET"])(api_mechanics)
-mcp.custom_route("/api/arena-stats", methods=["GET"])(api_arena_stats)
+# 競技場實戰統計:暫時下架(勝率定義/取樣偏差待調整),前端與 API 已停用。
+# 後端 arena_stats.py、爬蟲、MCP tool、資料檔都保留,修好再重新掛路由。
+# mcp.custom_route("/api/arena-stats", methods=["GET"])(api_arena_stats)
 
 
 def main() -> None:

@@ -345,7 +345,6 @@
     <button id="tab-aram">ARAM 平衡</button>
     <button id="tab-patch">Patch 改動</button>
     <button id="tab-mech">機制</button>
-    <button id="tab-stats" hidden>統計</button>
     <div class="langs">
       <button id="lang-zh" class="active">中</button>
       <button id="lang-en">EN</button>
@@ -491,7 +490,7 @@ async function _fetchTab(key, url, onOk, statusId, staleId) {
   return promise;
 }
 
-const TABS = ["aug", "arena", "aram", "patch", "mech", "stats"];
+const TABS = ["aug", "arena", "aram", "patch", "mech"];
 function showTab(which) {
   for (const t of TABS) {
     $("page-" + t).hidden = t !== which;
@@ -509,7 +508,6 @@ function showTab(which) {
   if (which === "arena" && !state.arena) loadArena();
   if (which === "patch" && !state.patch) loadPatch("latest");
   if (which === "mech" && !state.mech) loadMech();
-  if (which === "stats" && !state.stats) loadStats();
 }
 for (const t of TABS) $("tab-" + t).onclick = () => showTab(t);
 
@@ -693,7 +691,6 @@ function renderAugs() {
         <div class="en">${esc(zh ? a.nameEn : a.nameZh)}</div>
         <div class="desc">${richText(zh ? descZh : descEn)}</div>
       </div>
-      ${heroRow(a)}
     </div>`;
   }).join("");
 }
@@ -1023,7 +1020,7 @@ function renderStats() {
   $("stats-content").innerHTML = '<div class="table-wrap"><table>' + cols + rows + '</table></div>';
 }
 
-loadAugments(); loadStats();
+loadAugments();
 </script>
 </body>
 </html>
