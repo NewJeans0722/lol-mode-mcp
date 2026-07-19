@@ -48,6 +48,21 @@ uv run python scripts/check_update.py
    `mayhem_zh.json` = 英文強化名(穩定,不受改字影響)。
 5. **翻不出/沒把握的**保留英文(規則翻譯會自動標 🔤),不要硬翻。
 
+## 隱藏機制/伺服器端數值(第 6 項的延伸,每次 patch 順手看一眼)
+
+鍛體流(Shardholder Value)、三合一彩蛋這類**伺服器端隱藏數值,
+官方 patch notes 不會寫、check_update.py 也抓不到**(2026-07-19 踩雷:
+20–50% 早在 26.11 就上調成 20–100%,拖了兩個月才被使用者抓到)。做法:
+
+1. 開 wiki「Stat Bonus (Arena)」頁,對 `mode_mechanics.json` 的
+   鍛體流數值(範圍/條件/必出門檻)。
+2. 該頁 Patch history 可能**漏記**——數字對不上時直接看頁面
+   「View history」的編輯註記,以本文為準。
+3. 彩蛋合成系列(麵包三明治/什錦炒飯)對 `Module:ArenaAugmentData/data`
+   的 notes 欄(搜 "isn't available for choice")。
+4. 已知缺口:cdragon arena json 缺 Fame 解鎖/隱藏強化(飯三件套等),
+   get_augment 查不到是正常的,別誤判成 bug(詳見 NOTES 2026-07-19)。
+
 ## 貴賓/機制(第 6 項,季節大改版才需要)
 
 貴賓每賽季整批輪替,**LoL Wiki 的貴賓表會落後一整輪**(踩過雷)。

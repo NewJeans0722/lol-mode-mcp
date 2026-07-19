@@ -197,6 +197,31 @@ src/lol_mode_mcp/
 
 ## 日誌
 
+- **2026-07-19**(使用者抓到的兩處落後:鍛體流 20–50% 過時 + 三合一彩蛋沒寫):
+  - **Shardholder Value 修正 20%–50% → 20%–100%**。查證過程:wiki
+    「Stat Bonus (Arena)」頁本文寫 20–100,但該頁 Patch history 只記到
+    V25.24 的 80→50 —— 靠**頁面編輯歷史**破案:2026-05-27 編輯註記
+    「updated shardholder value」把 50 改成 100(約 26.11 版本期),
+    這次上調**沒寫進官方 patch notes**,check_update.py 抓不到。
+    同批編輯還移除信仰碎片(Faith Shard)、新增稜彩 Care Package。
+  - 順手補齊觸發條件(之前寫錯/寫漏):是「購買滿 10 個能力值鐵砧」
+    不是「累積 10 個屬性碎片」;幸運碎片不計數;25 鐵砧後必出;
+    裝備前可無限重骰;藥水不算購買;undo 救不回;任務裝備會擋。
+  - **新增「三合一彩蛋強化」段落**(mode_mechanics.json):官方 Arena 頁
+    寫 5th launch 有「22 個新強化 + 3 個彩蛋」。土司三件套(金階,
+    各 Q/W/E +100/200 急速)集滿自動合成稜彩「麵包三明治」(200/300/400
+    急速);飯三件套(Rice And Chicken/Fish/Pork,Fame 5 解鎖)合成
+    「Combination Fried Rice」。合成品不進三選一、會清出三個槽位。
+  - ⚠️ **資料源缺口(待決定)**:cdragon arena json(226 筆,7/15 仍在更新)
+    **缺 wiki Module:ArenaAugmentData 裡的 61 筆**,其中含現役強化
+    (飯三件套、Dust To Diamonds 等;僅 6 筆在 wiki 標記已移除)。
+    get_augment 查不到這些。可考慮把 wiki 模組併成補充源(英文,
+    需翻譯),或至少在 list_augments 加註「另有 Fame 解鎖/隱藏強化」。
+  - 飯三件套台服名 cdragon 沒有、官方 26.9 繁中頁已 404,依規矩保留英文🔤。
+  - 教訓:**伺服器端隱藏數值(鍛體流這類)官方筆記不會寫**,wiki 頁本文
+    比 Patch history 新;懷疑落後時直接查 wiki 頁「編輯歷史」最快。
+    SOP 第 6 項已加上「鍛體流/彩蛋對 Stat Bonus 頁核對」提醒。
+
 - **2026-07-18**(競技場統計網站整合 → 當天下架,勝率定義待重做):
   把統計分頁 + 強化卡片 top5 英雄頭像整合進 lol.zhongqqq.win
   (web.py `_arena_stats_payload` + `/api/arena-stats` + index.html 統計分頁),
