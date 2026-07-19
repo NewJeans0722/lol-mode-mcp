@@ -60,8 +60,11 @@ uv run python scripts/check_update.py
    「View history」的編輯註記,以本文為準。
 3. 彩蛋合成系列(麵包三明治/什錦炒飯)對 `Module:ArenaAugmentData/data`
    的 notes 欄(搜 "isn't available for choice")。
-4. 已知缺口:cdragon arena json 缺 Fame 解鎖/隱藏強化(飯三件套等),
-   get_augment 查不到是正常的,別誤判成 bug(詳見 NOTES 2026-07-19)。
+4. cdragon arena json 缺的強化(Fame 解鎖/隱藏/停用中等)已由
+   `arena_wiki.py` 從 wiki Module:ArenaAugmentData 補進圖鑑(標 🔤,
+   英文)。台服名對照在 `data/wiki_aug_zh.json` —— **只收官方繁中
+   patch notes 查證過的名字,不要用猜的**;新 patch 的官方筆記若有
+   點名 wiki 補充條目,把名字補進對照檔。
 
 ## 貴賓/機制(第 6 項,季節大改版才需要)
 

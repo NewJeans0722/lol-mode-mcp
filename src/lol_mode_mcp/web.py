@@ -96,6 +96,8 @@ def _augments_payload() -> dict:
                 "descEn": a.desc_en,
                 "icon": a.icon_url,
                 "maxLevel": a.max_level,
+                "source": a.source,
+                "note": a.note,
             }
             for a in data.augments
         ],

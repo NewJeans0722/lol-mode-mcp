@@ -7,10 +7,12 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
+from pathlib import Path
 
 from . import cache
 from .formatting import first_sentence, read_max_level, render_description
@@ -55,6 +57,8 @@ class Augment:
     desc_en: str
     icon_path: str = ""  # 例:assets/ux/cherry/augments/icons/adapt_large.png
     max_level: int = 1   # 星級上限(1 = 不可升級;實測最高 3)
+    source: str = "cdragon"  # "cdragon" | "wiki"(cdragon 缺漏、由 wiki 補充)
+    note: str = ""  # 狀態/取得方式註記(停用、Fame 解鎖、彩蛋合成等)
 
     @property
     def icon_url(self) -> str:
@@ -84,6 +88,60 @@ class ArenaData:
 def _pick_text(raw: dict) -> str:
     """優先用 desc(佔位符與 dataValues 對得上),沒有才退 tooltip。"""
     return raw.get("desc") or raw.get("tooltip") or ""
+
+
+_WIKI_ZH_PATH = Path(__file__).resolve().parent / "data" / "wiki_aug_zh.json"
+
+
+def _load_wiki_zh() -> dict[str, dict]:
+    try:
+        return json.loads(_WIKI_ZH_PATH.read_text(encoding="utf-8"))["augments"]
+    except Exception as exc:  # noqa: BLE001 — 對照檔壞掉不應擋住主資料
+        logger.warning("wiki_aug_zh.json unavailable: %s", exc)
+        return {}
+
+
+def _norm_name(s: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", s.lower())
+
+
+def _wiki_supplement(existing: list[Augment]) -> list[Augment]:
+    """把 wiki 有、cdragon 沒有的強化補成 Augment(英文原文 + 台服名對照)。
+
+    wiki 模組是「本季全部強化」,含 Fame 解鎖/隱藏合成/暫時停用的;
+    已標記 Removed since 的跳過。抓取失敗只記 log,不影響 cdragon 主資料。
+    """
+    from .arena_wiki import get_wiki_augments  # 延遲匯入避免循環
+
+    entries = get_wiki_augments().data["entries"]
+    zh_map = _load_wiki_zh()
+    known = {_norm_name(a.name_en) for a in existing}
+    out: list[Augment] = []
+    for i, (name, e) in enumerate(sorted(entries.items())):
+        if e["removed"] or _norm_name(name) in known:
+            continue
+        overlay = zh_map.get(name, {})
+        desc_parts = [e["description"]]
+        for lv, txt in enumerate(e["levels"], start=1):
+            desc_parts.append(f"★{lv}:{txt}")
+        if e["notes"]:
+            desc_parts.append(e["notes"])
+        desc = "\n".join(p for p in desc_parts if p).strip()
+        from .wikitext import translate_annotations_en
+        out.append(Augment(
+            id=-(1001 + i),  # 負數合成 id,不與 cdragon 衝突
+            api_name=f"wiki:{name}",
+            rarity=e["rarity"],
+            name_en=name,
+            name_zh=overlay.get("nameZh", name),
+            desc_en=translate_annotations_en(desc),
+            desc_zh=desc,
+            max_level=max(1, len(e["levels"])),
+            source="wiki",
+            note=overlay.get("note", ""),
+        ))
+    logger.info("wiki supplement merged: %d augments", len(out))
+    return out
 
 
 def _fetch_arena_data() -> ArenaData:
@@ -131,6 +189,21 @@ def _fetch_arena_data() -> ArenaData:
             icon_path=raw_en.get("iconLarge", ""),
             max_level=read_max_level(dv),
         ))
+
+    # 台服名/狀態對照檔的 note 也適用於 cdragon 條目(如土司彩蛋合成)
+    zh_map = _load_wiki_zh()
+    by_norm = {_norm_name(a.name_en): a for a in augments}
+    for en_name, overlay in zh_map.items():
+        target = by_norm.get(_norm_name(en_name))
+        if target and overlay.get("note"):
+            target.note = overlay["note"]
+
+    # wiki 補充:cdragon 缺的現役強化(Fame 解鎖/隱藏合成/停用中等)
+    try:
+        augments.extend(_wiki_supplement(augments))
+    except Exception as exc:  # noqa: BLE001 — 補充源掛掉不影響主資料
+        logger.warning("wiki augment supplement unavailable: %s", exc)
+
     logger.info("arena data loaded: %d augments, patch %s", len(augments), patch)
     return ArenaData(augments=augments, patch=patch)
 
@@ -201,6 +274,16 @@ def format_augment_detail(aug: Augment, locale: str) -> str:
         "─" * 30,
         aug.desc(locale) or "(此強化沒有說明文字)",
     ]
+    if aug.note:
+        lines.append(f"📌 {aug.note}" if locale == "zh_tw"
+                     else f"📌 {aug.note} (zh)")
+    if aug.source == "wiki":
+        lines.append(
+            "🔤 此強化不在 cdragon 資料內(Fame 解鎖/隱藏合成/暫停用/"
+            "上一輪替類),以上為 LoL Wiki 英文資料;是否登場以遊戲內為準。"
+            if locale == "zh_tw" else
+            "🔤 Not in cdragon data (Fame-locked/hidden/disabled/rotated "
+            "pool); sourced from LoL Wiki. In-game availability may vary.")
     return "\n".join(lines)
 
 
@@ -311,9 +394,19 @@ def do_list_augments(tier: str = "all", locale: str = "zh_tw") -> str:
         title = f"{icon} {zh}({en})" if locale == "zh_tw" else f"{icon} {en}"
         lines.append(f"## {title} — {len(group)} 個")
         for a in sorted(group, key=lambda x: x.name(locale)):
-            lines.append(f"- **{a.name(locale)}**({a.name_en}):"
+            mark = " 🔤" if a.source == "wiki" else ""
+            lines.append(f"- **{a.name(locale)}**({a.name_en}){mark}:"
                          f"{first_sentence(a.desc(locale))}")
         lines.append("")
 
+    if any(a.source == "wiki" for a in data.augments):
+        lines.append(
+            "🔤 = cdragon 資料缺漏、由 LoL Wiki 補充(英文):含聲望 Fame 解鎖、"
+            "隱藏合成、暫時停用或上一輪替的強化,是否登場以遊戲內為準。"
+            if locale == "zh_tw" else
+            "🔤 = missing from cdragon, supplemented from LoL Wiki (includes "
+            "Fame-locked/hidden/disabled/rotated-out augments; in-game "
+            "availability may vary).")
+        lines.append("")
     lines.append(_source_line(result, data.patch, locale))
     return "\n".join(lines)

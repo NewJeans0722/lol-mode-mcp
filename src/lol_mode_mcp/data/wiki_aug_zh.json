@@ -1,0 +1,25 @@
+{
+  "_meta": {
+    "description": "wiki 補充強化的台服名/狀態對照。key = LoL Wiki 條目英文名。nameZh 一律取自官方繁中 patch notes(查證過描述吻合才收錄,見 NOTES 2026-07-19);沒有官方繁中名的不要用猜的,缺項會以英文顯示。note 是狀態註記(停用/重新啟用等)。",
+    "last_reviewed": "2026-07-19",
+    "sources": "官方繁中 patch notes 26.13(塵土變鑽石/最終型態/炫彩躍動/風險計算/連鎖閃電/咒法/任務：虛空獻祭/升級收藏家)、26.14(雙響炮/雙重命中/暴擊節奏)"
+  },
+  "augments": {
+    "Dust To Diamonds": {"nameZh": "塵土變鑽石"},
+    "Final Form": {"nameZh": "最終型態"},
+    "Chroma Flux": {"nameZh": "炫彩躍動"},
+    "Calculated Risk": {"nameZh": "風險計算", "note": "26.13 起停用"},
+    "Chain Lightning": {"nameZh": "連鎖閃電", "note": "26.13 起停用"},
+    "Spellcraft": {"nameZh": "咒法"},
+    "Quest: Icathia's Fall": {"nameZh": "任務：虛空獻祭"},
+    "Upgrade Collector": {"nameZh": "升級：收藏家"},
+    "Twin Fire": {"nameZh": "雙響炮", "note": "26.13 停用、26.14 重新啟用"},
+    "Double Tap": {"nameZh": "雙重命中"},
+    "Critical Rhythm": {"nameZh": "暴擊節奏"},
+    "Bread Sandwich": {"note": "彩蛋合成強化:集滿土司三件套自動合成,不會出現在三選一"},
+    "Combination Fried Rice": {"note": "彩蛋合成強化:集滿飯三件套自動合成,不會出現在三選一"},
+    "Rice And Chicken": {"note": "聲望(Fame)等級 5 解鎖"},
+    "Rice And Fish": {"note": "聲望(Fame)等級 5 解鎖"},
+    "Rice And Pork": {"note": "聲望(Fame)等級 5 解鎖"}
+  }
+}

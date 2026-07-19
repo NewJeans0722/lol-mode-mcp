@@ -197,6 +197,37 @@ src/lol_mode_mcp/
 
 ## 日誌
 
+- **2026-07-19**(圖鑑補上 cdragon 缺的 55 筆強化,wiki 補充源上線):
+  使用者接著抓:「海克斯圖鑑的微調更新也沒上」。查證結論:
+  **cdragon 有收錄的強化,數值其實都跟上了**(能力值系列 10%→20%、
+  寶石手套 140/150/160% 都是 26.10 後的新值)——問題是**涵蓋面**:
+  cdragon arena json 226 筆 vs wiki 模組 255+ 筆,缺的含現役強化
+  (飯三件套、升級系、雙響炮 26.14 重新啟用、塵土變鑽石等)。實作:
+  - 新模組 `arena_wiki.py`:抓 `Module:ArenaAugmentData/data`(Lua),
+    解析 description/tier/level1-3/notes,`clean_wikitext` 清模板、
+    HTML 清單轉 •;description 含「Removed since」的跳過(目前 6 筆);
+    解析 <100 筆視為失敗退舊快取。cache key `wiki_arena_augments`。
+  - `arena.py` `_wiki_supplement()`:以正規化名稱比對,只補 cdragon
+    沒有的(55 筆);負數 id 防衝突;`Augment` 新欄位 `source`/`note`。
+    補充源掛掉只 log 不影響主資料。輸出:detail 加 📌 note 與 🔤
+    免責行,list 加 🔤 標記與圖例;網頁卡片加 wiki🔤 badge + 📌。
+  - **台服名對照檔 `data/wiki_aug_zh.json`**:只收官方繁中 patch notes
+    查證過的 11 個名字(塵土變鑽石/最終型態/炫彩躍動/風險計算/連鎖閃電
+    /咒法/任務：虛空獻祭/升級：收藏家/雙響炮/雙重命中/暴擊節奏),
+    描述吻合才收。⚠️ 26.13 筆記的「洗劫」對不上 Scavenger 的描述,
+    **沒收**(Scavenger 是搶奪敗方強化,洗劫是詛咒跑速——名字懸缺)。
+    note 欄記狀態:風險計算/連鎖閃電 26.13 停用、雙響炮 26.14 回歸、
+    飯三件套 Fame 5 解鎖、合成系不進三選一。
+  - ⚠️ 已知限制:wiki 模組含**上一輪替未標移除**的條目(雪球大戰、
+    波羅王之躍是 V14/26.05 冬季主題),無法逐筆判定是否在本季池子,
+    輸出一律標「是否登場以遊戲內為準」。官方 zh 26.9 頁已 404,
+    飯三件套台服名拿不到。
+  - 驗收:134 tests(+5,test_arena_wiki.py 離線 fixture);本機實跑
+    get_augment(雙響炮/Rice And Chicken/麵包三明治)、list gold 17 筆
+    🔤、web payload 281 筆 tier 全對映、index.html JS new Function
+    parse 過。official_notes 小發現:`get_official_zh` 要傳 "V26.13"
+    格式(帶 V),傳 "26.13" 會 slug 全滅。
+
 - **2026-07-19**(使用者抓到的兩處落後:鍛體流 20–50% 過時 + 三合一彩蛋沒寫):
   - **Shardholder Value 修正 20%–50% → 20%–100%**。查證過程:wiki
     「Stat Bonus (Arena)」頁本文寫 20–100,但該頁 Patch history 只記到
