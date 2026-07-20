@@ -55,6 +55,37 @@ def test_extract_missing_section_returns_none():
     assert extract_mode_section("== Items ==\n* x\n") is None
 
 
+# patch 頁實際結構:模式段落是三級標題,Mayhem 後面就接 Arena。
+# 只找「下一個二級標題」會讓 Mayhem 吃掉整個 Arena 段(2026-07-20 踩到)。
+NESTED_SAMPLE = """== League of Legends V26.14 ==
+=== ARAM: Mayhem ===
+* Augments
+** Dimension Shift
+*** Cooldown: 108s ⇒ 75s
+=== Arena ===
+* Champions
+** Ambessa
+*** Q1 Base Attack Damage Ratio: 60% ⇒ 45%
+== See Also ==
+* links
+"""
+
+
+def test_extract_stops_at_same_level_heading():
+    mayhem = extract_mode_section(NESTED_SAMPLE, "ARAM: Mayhem")
+    assert "Dimension Shift" in mayhem
+    assert "Ambessa" not in mayhem          # 後面的 Arena 段不能混進來
+    arena = extract_mode_section(NESTED_SAMPLE, "Arena")
+    assert "Ambessa" in arena
+    assert "links" not in arena             # 二級標題仍是邊界
+
+
+def test_extract_keeps_deeper_subheadings():
+    text = "=== Arena ===\n* A\n==== Sub ====\n* B\n== Next ==\n* C\n"
+    sec = extract_mode_section(text, "Arena")
+    assert "* A" in sec and "* B" in sec and "* C" not in sec
+
+
 def test_parse_structure():
     cats = _cats()
     assert [c["category"] for c in cats] == \

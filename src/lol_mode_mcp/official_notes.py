@@ -112,10 +112,27 @@ def parse_official_notes(page_html: str) -> dict[str, list[dict]]:
             indent = "  " if (style == "champ" and any(
                 ln.startswith("- ") for ln in entry["lines"])) else ""
             entry["lines"].append(f"{indent}- {_text(li)}")
-    # 清掉空分類
     for sc in scopes:
-        scopes[sc] = [c for c in scopes[sc] if c["entries"]]
+        _drop_trailing_intro(scopes[sc], sc)
+        scopes[sc] = [c for c in scopes[sc] if c["entries"]]  # 清掉空分類
     return scopes
+
+
+# 每個模式段落的開場白(「競技場愛好者們，歡迎回來!…」)在頁面上排在自己的
+# h2 之前,會被算成「上一個 scope 最後一個條目」——2026-07-20 實際看到競技場
+# 開場白掛在大混戰的【錯誤修正】下。特徵:沒有任何改動行、整句散文
+# (不含改動用的「:」或「⇒」)、且一定是該 scope 最後一筆。
+def _drop_trailing_intro(cats: list[dict], scope: str) -> None:
+    while cats and cats[-1]["entries"]:
+        name = cats[-1]["entries"][-1]["name"]
+        if (cats[-1]["entries"][-1]["lines"] or len(name) < 20
+                or "：" in name or ":" in name or "⇒" in name):
+            return
+        cats[-1]["entries"].pop()
+        logger.info("dropped %s section intro paragraph: %.30s…", scope, name)
+        if cats[-1]["entries"]:
+            return
+        cats.pop()
 
 
 def _slug_candidates(title: str) -> list[str]:

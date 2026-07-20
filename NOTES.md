@@ -197,6 +197,32 @@ src/lol_mode_mcp/
 
 ## 日誌
 
+- **2026-07-20b**(背景改全景 + 全資料重驗抓到 3 個 patch 解析 bug):
+  使用者要求「左右景改成全景、淡一點」並要求資料全部重驗一次。
+  - **背景**:`#bg`/`#bg-left` 兩塊 48vw 面板(mask 漸層)→ 整頁一張
+    `inset:0` cover,靠 `opacity` 壓淡(深 .16 / 淺 .10 / 窄螢幕再降)。
+    兩個 select 併成一個;舊的 `bgRight2`/`bgLeft2` localStorage 自動接過來。
+  - ⚠️ **patch 段落抽取吃掉隔壁模式(最嚴重)**:`extract_mode_section`
+    只找「下一個二級標題」當邊界,但 patch 頁的模式段是**三級**標題
+    (`=== ARAM: Mayhem ===`、`=== Arena ===`),Mayhem 段一路吃到頁尾的
+    `== See Also ==`,把整個 Arena 段(13 英雄/5 道具/4 強化)都算成
+    Mayhem 改動。修法:比對標題層級,`^={1,level}[^=]` 才算邊界
+    (更深的子標題不切斷)。同樣影響 general 的 Champions/Items ——
+    原本 Items 條目會被併進 Champions。
+  - ⚠️ **官方繁中開場白掛到隔壁模式**:每個模式段的開場白 `<p>`
+    在頁面上排在自己的 h2 **之前**,被算成上一個 scope 的最後一筆條目
+    (實例:競技場開場白出現在大混戰的【錯誤修正】下)。
+    `_drop_trailing_intro()` 用「該 scope 最後一筆 + 無改動行 + 無
+    `:`/`⇒` + ≥20 字」判定並丟掉,附 log。
+  - 小修:wiki 分級數值 `{{pp|10;15;20|1;6;11}}` 的 `;` 改排成 `/`;
+    `_GENERAL_SECTIONS` 補上 "Neutral buffs"(wiki 把野怪段改名了,
+    藍 buff 技能急速那條原本沒收進來)。
+  - 驗收:139 tests(+5,含三個 bug 的回歸測試);7 個 API payload 全綠;
+    latest 與 V26.13 三個 scope 都重解析過無殘留散文行。
+  - 已知缺口(未做):官方繁中的 Mayhem 錯誤修正列在獨立 h2
+    「錯誤修正與遊戲體驗改善」(各模式混在一起),目前沒對應到 scope,
+    所以中文版看不到 Mayhem bugfix 清單(英文 wiki 版有 8 筆)。
+
 - **2026-07-20**(ARAM Mayhem 強化圖示改用彩色大圖):使用者回報
   「ARAM 海克斯圖示全是灰的,競技場就有顏色」。原因:兩邊資料源不同 ——
   競技場走 `cdragon/arena/{locale}.json` 的 `iconLarge`(彩色),

@@ -56,7 +56,9 @@ SCOPES = {
     "general": {"zh": "一般對戰(召喚峽谷)", "en": "General (Summoner's Rift)"},
     "mayhem": {"zh": "ARAM: Mayhem", "en": "ARAM: Mayhem"},
 }
-_GENERAL_SECTIONS = ["Champions", "Items", "Summoner Spells", "Runes", "Monsters"]
+# wiki 近期把野怪類段落改叫 "Neutral buffs"(舊名 "Monsters"),兩個都收
+_GENERAL_SECTIONS = ["Champions", "Items", "Summoner Spells", "Runes",
+                     "Monsters", "Neutral buffs"]
 
 VERSIONS_URL = "https://ddragon.leagueoflegends.com/api/versions.json"
 ITEM_URL = "https://ddragon.leagueoflegends.com/cdn/{ver}/data/{locale}/item.json"
@@ -97,12 +99,20 @@ def normalize_patch(patch: str) -> str | None:
 # ------------------------------------------------------------ 段落解析
 
 def extract_mode_section(wikitext: str, mode: str = "Arena") -> str | None:
-    """取出 '== Arena ==' 到下一個二級標題之間的內容(標題等號數容錯)。"""
-    m = re.search(rf"^==+\s*{re.escape(mode)}\s*=+\s*$", wikitext, re.M)
+    """取出 '=== Arena ===' 到「下一個同級或更高級標題」之間的內容。
+
+    ⚠️ 一定要比對標題層級:patch 頁的模式段落是三級標題
+    (`=== ARAM: Mayhem ===`、`=== Arena ===`),若只找下一個二級標題,
+    Mayhem 段會一路吃到頁尾的 `== See Also ==`,把後面整個 Arena 段
+    (英雄/道具/強化)都算成 Mayhem 的改動(2026-07-20 實際踩到)。
+    """
+    m = re.search(rf"^(=+)\s*{re.escape(mode)}\s*=+\s*$", wikitext, re.M)
     if not m:
         return None
+    level = len(m.group(1))
     rest = wikitext[m.end():]
-    nxt = re.search(r"^==[^=]", rest, re.M)
+    # `={1,level}[^=]`:等號數 ≤ 本段層級才算邊界,更深的子標題不切斷
+    nxt = re.search(rf"^={{1,{level}}}[^=]", rest, re.M)
     return rest[:nxt.start()] if nxt else rest
 
 

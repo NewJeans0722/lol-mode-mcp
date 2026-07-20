@@ -30,6 +30,11 @@ def test_pp_is_per_level():
     assert clean_wikitext("{{pp|1 to 1.5 for 3|1 to 11}}") == "1−1.5(隨等級)"
 
 
+def test_pp_semicolon_list_becomes_slashes():
+    # {{pp|10;15;20|1;6;11}} = 1/6/11 級各一個值,`;` 換成中文習慣的 `/`
+    assert clean_wikitext("{{pp|10;15;20|1;6;11}}") == "10/15/20(隨等級)"
+
+
 def test_pp_with_percent_key_and_type():
     out = clean_wikitext(
         "{{pp|key=%|key1=%|type='''missing''' health|0 to 35 for 11|0 to 100"

@@ -23,7 +23,14 @@ logger = logging.getLogger(__name__)
 _RANGE_RE = re.compile(r"(-?\d+(?:\.\d+)?)\s+to\s+(-?\d+(?:\.\d+)?)(?:\s+\d+)?")
 
 
+# 分級數值列表:wiki 用 `;` 分隔(如 {{pp|10;15;20|1;6;11}} = 1/6/11 級各一值),
+# 中文習慣用 `/`。只換純數字列表,避免動到說明文字裡的分號。
+_LIST_RE = re.compile(r"(?<![\d.])(\d+(?:\.\d+)?(?:\s*;\s*\d+(?:\.\d+)?)+)(?![\d.])")
+
+
 def _fmt_range(value: str) -> str:
+    value = _LIST_RE.sub(
+        lambda m: "/".join(p.strip() for p in m.group(1).split(";")), value)
     return _RANGE_RE.sub(lambda m: f"{m.group(1)}−{m.group(2)}", value)
 
 
