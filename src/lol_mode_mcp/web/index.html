@@ -65,58 +65,27 @@
     opacity: .04;
   }
   body.light::before { opacity: .07; }
-  /* 背景原畫:錨定外側邊緣 + 60% 可視區,人物自然落在可見範圍 */
+  /* 背景原畫:全景(整頁一張),壓很淡以免蓋過內容 */
   #bg {
-    position: fixed; top: 0; right: 0; bottom: 0; z-index: -3;
-    width: min(48vw, 920px); pointer-events: none;
-    background-size: cover; background-position: right 22%;
-    -webkit-mask-image: linear-gradient(to left, rgba(0,0,0,.95) 60%, transparent 92%);
-    mask-image: linear-gradient(to left, rgba(0,0,0,.95) 60%, transparent 92%);
+    position: fixed; inset: 0; z-index: -3; pointer-events: none;
+    background-size: cover; background-position: center 20%;
+    opacity: .16;            /* 淡:只當氛圍,不干擾閱讀 */
+    filter: saturate(.85);
   }
-  #bg.flip {
-    transform: scaleX(-1);
-    -webkit-mask-image: linear-gradient(to right, rgba(0,0,0,.95) 60%, transparent 92%);
-    mask-image: linear-gradient(to right, rgba(0,0,0,.95) 60%, transparent 92%);
-  }
-  #bg::after {  /* 輕薄遮罩:右側文字(計數等)仍可讀,但不蓋掉人物 */
+  body.light #bg { opacity: .1; }  /* 淺色底更容易糊,再淡一階 */
+  #bg.flip { transform: scaleX(-1); }
+  /* 內容區上下略加暗/亮化,長頁捲動時文字始終壓得住背景 */
+  #bg::after {
     content: ""; position: absolute; inset: 0;
-    background: linear-gradient(180deg, rgba(10,14,20,.35) 0%, rgba(10,14,20,.2) 40%, rgba(10,14,20,.55) 100%);
+    background: linear-gradient(180deg, rgba(10,14,20,.25) 0%, transparent 35%, rgba(10,14,20,.45) 100%);
   }
   body.light #bg::after {
-    background: linear-gradient(180deg, rgba(243,241,234,.45) 0%, rgba(243,241,234,.3) 40%, rgba(243,241,234,.6) 100%);
+    background: linear-gradient(180deg, rgba(243,241,234,.3) 0%, transparent 35%, rgba(243,241,234,.5) 100%);
   }
-  #bg-left {
-    position: fixed; top: 0; left: 0; bottom: 0; z-index: -3;
-    width: min(48vw, 920px); pointer-events: none;
-    background-size: cover; background-position: left 22%;
-    -webkit-mask-image: linear-gradient(to right, rgba(0,0,0,.95) 60%, transparent 92%);
-    mask-image: linear-gradient(to right, rgba(0,0,0,.95) 60%, transparent 92%);
-  }
-  #bg-left.flip {
-    transform: scaleX(-1);
-    -webkit-mask-image: linear-gradient(to left, rgba(0,0,0,.95) 60%, transparent 92%);
-    mask-image: linear-gradient(to left, rgba(0,0,0,.95) 60%, transparent 92%);
-  }
-  #bg-left::after {
-    content: ""; position: absolute; inset: 0;
-    background: linear-gradient(180deg, rgba(10,14,20,.35) 0%, rgba(10,14,20,.2) 40%, rgba(10,14,20,.55) 100%);
-  }
-  body.light #bg-left::after {
-    background: linear-gradient(180deg, rgba(243,241,234,.45) 0%, rgba(243,241,234,.3) 40%, rgba(243,241,234,.6) 100%);
-  }
-  /* 窄螢幕:側欄放不下,右欄退回全幅淡化背景、左欄隱藏 */
+  /* 窄螢幕:字級相對更大、行更擠,背景再壓淡一點 */
   @media (max-width: 1100px) {
-    #bg-left { display: none; }
-    #bg {
-      width: 100vw; background-position: center 22% !important;
-      -webkit-mask-image: none; mask-image: none;
-    }
-    #bg::after {
-      background: linear-gradient(180deg, rgba(10,14,20,.82) 0%, rgba(10,14,20,.93) 60%, rgba(10,14,20,.97) 100%);
-    }
-    body.light #bg::after {
-      background: linear-gradient(180deg, rgba(243,241,234,.88) 0%, rgba(243,241,234,.95) 60%, rgba(243,241,234,.98) 100%);
-    }
+    #bg { opacity: .1; }
+    body.light #bg { opacity: .07; }
   }
   header {
     padding: 28px 20px 0; max-width: 1180px; margin: 0 auto;
@@ -335,7 +304,6 @@
 </head>
 <body>
 <div id="bg"></div>
-<div id="bg-left"></div>
 <header>
   <h1>LoL <span class="gold">模式資料庫</span><span class="byline">by zhongiii</span></h1>
   <p class="sub" id="meta">載入中…</p>
@@ -350,8 +318,7 @@
       <button id="lang-en">EN</button>
       <button id="theme-btn" title="深色/淺色">◐</button>
       <button id="font-btn" title="字體大小">A</button>
-      <select id="bg-left-select" title="左側背景"><option value="">左景:無</option></select>
-      <select id="bg-select" title="右側背景"><option value="">右景:無</option></select>
+      <select id="bg-select" title="背景原畫"><option value="">背景:無</option></select>
     </div>
   </nav>
 </header>
@@ -536,18 +503,14 @@ $("theme-btn").onclick = () =>
   setTheme(document.body.classList.contains("light") ? "dark" : "light");
 try { setTheme(localStorage.getItem("theme") || "dark"); } catch (e) {}
 
-/* ---------------- 背景原畫(官方 splash,左右雙欄) ---------------- */
-// 翻轉清單由後端 backgrounds API 的 flip 欄位控制。
-// 右側面板保留人物原方向；左側面板自動反轉(flip=!flip)。
-const BG_SIDES = {
-  right: { el: "bg", sel: "bg-select", store: "bgRight2", def: () => "" },
-  left:  { el: "bg-left", sel: "bg-left-select", store: "bgLeft2", def: () => "" },
-};
+/* ---------------- 背景原畫(官方 splash,全景一張) ---------------- */
+// 翻轉由後端 backgrounds API 的 flip 欄位控制(人物面向內容區)。
+const BG_STORE = "bgFull";
+const BG_LEGACY = ["bgRight2", "bgLeft2"];  // 舊的左右雙欄設定,沿用其中一張
 
-function setBg(side, v) {
-  const cfg = BG_SIDES[side];
+function setBg(v) {
   v = v || "";
-  $(cfg.sel).value = v;
+  $("bg-select").value = v;
   let url = "", flip = false;
   if (v) {
     const [cid, num] = v.split("_");
@@ -555,10 +518,9 @@ function setBg(side, v) {
     const s = c && c.skins.find((x) => String(x.num) === num);
     if (s) { url = s.url; flip = s.flip || false; }
   }
-  if (side === "left") flip = !flip;
-  $(cfg.el).style.backgroundImage = url ? `url("${url}")` : "";
-  $(cfg.el).classList.toggle("flip", url && flip);
-  try { localStorage.setItem(cfg.store, v); } catch (e) {}
+  $("bg").style.backgroundImage = url ? `url("${url}")` : "";
+  $("bg").classList.toggle("flip", !!url && flip);
+  try { localStorage.setItem(BG_STORE, v); } catch (e) {}
 }
 
 async function initBg() {
@@ -566,20 +528,19 @@ async function initBg() {
     const r = await fetch("/api/backgrounds");
     if (!r.ok) return;
     state.bgs = (await r.json()).champions;
-    const groups = state.bgs.map((c) => `<optgroup label="${esc(c.name)}">` +
-      c.skins.map((s) =>
-        `<option value="${c.id}_${s.num}">${esc(s.name)}</option>`
-      ).join("") +
-      "</optgroup>").join("");
-    for (const [side, cfg] of Object.entries(BG_SIDES)) {
-      const label = side === "left" ? "左景:無" : "右景:無";
-      $(cfg.sel).innerHTML = `<option value="">${label}</option>` + groups;
-      let v = null;
-      try { v = localStorage.getItem(cfg.store); } catch (e) {}
-      if (v === null) v = cfg.def(state.bgs);
-      setBg(side, v);
-      $(cfg.sel).onchange = (e) => setBg(side, e.target.value);
-    }
+    $("bg-select").innerHTML = '<option value="">背景:無</option>' +
+      state.bgs.map((c) => `<optgroup label="${esc(c.name)}">` +
+        c.skins.map((s) =>
+          `<option value="${c.id}_${s.num}">${esc(s.name)}</option>`
+        ).join("") + "</optgroup>").join("");
+    let v = null;
+    try {
+      v = localStorage.getItem(BG_STORE);
+      // 首次改版:把舊的左/右選擇接過來,使用者不用重挑
+      if (v === null) for (const k of BG_LEGACY) v = v || localStorage.getItem(k);
+    } catch (e) {}
+    setBg(v || "");
+    $("bg-select").onchange = (e) => setBg(e.target.value);
   } catch (e) {}
 }
 initBg();
