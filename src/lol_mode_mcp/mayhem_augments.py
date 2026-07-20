@@ -34,6 +34,7 @@ WIKI_API = "https://wiki.leagueoflegends.com/en-us/api.php"
 MODULE_TITLE = "Module:MayhemAugmentData/data"
 _ASSET_BASE = ("https://raw.communitydragon.org/latest/plugins/"
                "rcp-be-lol-game-data/global/default")
+_GAME_ASSET_BASE = "https://raw.communitydragon.org/latest/game"
 _STRINGTABLE_URL = ("https://raw.communitydragon.org/latest/game/zh_tw/"
                     "data/menu/en_us/lol.stringtable.json")
 _SUMMARY_KEY_RE = re.compile(
@@ -90,6 +91,16 @@ def _icon_url(path: str) -> str:
     return f"{_ASSET_BASE}/{path.lower().lstrip('/')}"
 
 
+def _icon_url_large(path: str) -> str:
+    """cherry-augments 只給 `*_small.png`(遊戲內小圖=灰階剪影),
+    競技場走 arena json 的 `iconLarge`(彩色)才有顏色。同一份素材庫裡
+    大圖就在隔壁,換檔名即可;`game/` 這個 base 才有 large(plugins/ 下沒有)。
+    170 個 ARAM 強化中 8 個沒有大圖,前端 onerror 會退回小圖。"""
+    small = _icon_url(path)
+    tail = small.split("/global/default/", 1)[-1].lstrip("/")
+    return f"{_GAME_ASSET_BASE}/{tail.replace('_small.png', '_large.png')}"
+
+
 def _fetch_mayhem_codex() -> list[dict]:
     raw = fetch_json(WIKI_API, params={
         "action": "query", "prop": "revisions", "rvprop": "content|timestamp",
@@ -105,7 +116,8 @@ def _fetch_mayhem_codex() -> list[dict]:
 
     # 官方 zh 名、圖示、內部名(cherry-augments,以正規化名對回)
     zh_names: dict[str, str] = {}
-    icons: dict[str, str] = {}
+    icons: dict[str, str] = {}       # 彩色大圖(顯示用)
+    icons_small: dict[str, str] = {}  # 灰階小圖(大圖 404 時的後備)
     base_names: dict[str, str] = {}  # 正規化英文名 → 字串表內部名(去 ARAM_)
     try:
         en_list = fetch_json(CHERRY_AUG_URL.format(loc="default"))
@@ -119,7 +131,8 @@ def _fetch_mayhem_codex() -> list[dict]:
                 zh_names[key] = zh
             icon = a.get("augmentSmallIconPath", "")
             if icon:
-                icons[key] = _icon_url(icon)
+                icons[key] = _icon_url_large(icon)
+                icons_small[key] = _icon_url(icon)
             nid = a.get("augmentNameId", "")
             if nid:
                 base_names[key] = re.sub(r"[^a-z0-9]", "",
@@ -145,6 +158,7 @@ def _fetch_mayhem_codex() -> list[dict]:
         key = _name_key(e["nameEn"])
         e["nameZh"] = zh_names.get(key)
         e["icon"] = icons.get(key)
+        e["iconSmall"] = icons_small.get(key)
         if e["nameZh"]:
             name_map[e["nameEn"].lower()] = e["nameZh"]
 

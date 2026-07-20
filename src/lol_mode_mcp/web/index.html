@@ -685,7 +685,7 @@ function renderAugs() {
     const descEn = a.descEn !== undefined ? a.descEn : a.desc;
     return `
     <div class="card ${a.tier}">
-      ${a.icon ? `<img src="${a.icon}" alt="" loading="lazy">` : ""}
+      ${a.icon ? `<img src="${a.icon}" alt="" loading="lazy"${a.iconSmall ? ` onerror="this.onerror=null;this.src='${a.iconSmall}'"` : ""}>` : ""}
       <div class="body">
         <h3>${esc(zh ? a.nameZh : a.nameEn)}<span class="badge ${a.tier}">${esc(zh ? a.tierZh : a.tier)}</span>${a.maxLevel > 1 ? `<span class="badge star">★${a.maxLevel}</span>` : ""}${a.source === "wiki" ? `<span class="badge star" title="${zh ? "cdragon 缺此強化,資料取自 LoL Wiki(英文)" : "Missing from cdragon; sourced from LoL Wiki"}">wiki🔤</span>` : ""}</h3>
         <div class="en">${esc(zh ? a.nameEn : a.nameZh)}</div>

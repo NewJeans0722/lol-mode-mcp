@@ -334,6 +334,7 @@ def _mayhem_augments_payload() -> dict:
                 "descZh": e.get("descZh") or e["desc"],
                 "descComplete": e.get("descComplete", False),
                 "icon": e["icon"] or "",
+                "iconSmall": e.get("iconSmall") or "",
             }
             for e in result.data
         ],

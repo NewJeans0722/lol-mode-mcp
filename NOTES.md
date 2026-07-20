@@ -197,6 +197,21 @@ src/lol_mode_mcp/
 
 ## 日誌
 
+- **2026-07-20**(ARAM Mayhem 強化圖示改用彩色大圖):使用者回報
+  「ARAM 海克斯圖示全是灰的,競技場就有顏色」。原因:兩邊資料源不同 ——
+  競技場走 `cdragon/arena/{locale}.json` 的 `iconLarge`(彩色),
+  Mayhem 走 `cherry-augments.json`,**該檔只有 `augmentSmallIconPath`**,
+  而 `*_small.png` 是遊戲內的**灰階剪影**(~940 bytes vs 大圖 ~10 KB)。
+  修法:`mayhem_augments._icon_url_large()` 把檔名 `_small`→`_large`,
+  並換 base ——⚠️ `plugins/rcp-be-lol-game-data/...` 底下**沒有** large
+  (404),大圖只在 `raw.communitydragon.org/latest/game/` 這個 base。
+  實測 218 個有圖的強化中 216 個有大圖,缺的 2 個(ReEnergize、DropBear)
+  由前端 `onerror` 退回小圖(payload 多帶 `iconSmall`)。
+  路徑同時涵蓋 `ux/cherry/` 與 `ux/kiwi/` 兩種素材夾,不用特判。
+  順手跑 `check_update.py`:1~5 項全綠(ddragon/cdragon 同為 16.14、
+  281 筆競技場說明無 `@` 漏出、技能改動 100% 可翻、220 筆 Mayhem 100%
+  完整中文、對照檔 key 全對得上),資料本來就是即時抓,無須人工補譯。
+
 - **2026-07-19**(圖鑑補上 cdragon 缺的 55 筆強化,wiki 補充源上線):
   使用者接著抓:「海克斯圖鑑的微調更新也沒上」。查證結論:
   **cdragon 有收錄的強化,數值其實都跟上了**(能力值系列 10%→20%、
