@@ -176,7 +176,7 @@
   "On-target cooldown halved.": "對同一目標的冷卻減半。",
   "Only when they cast an ability, will they visually teleport to their real position. Once the cast of that ability is over, they will visually teleport back to their original position.": "只有在施放技能時,外觀才會傳送到實際位置;技能施放結束後,外觀又會傳送回原來的位置。",
   "Outer cone bonus AD ratio changed to 3% per 100 bonus AD from 2.5%.": "外圈錐形的額外 AD 係數改為每 100 額外 AD 增加 3%(原為 2.5%)。",
-  "Overwhelm additional stack base damage changed to 4;5;6;7(隨 Golden Eclipse's rank 變化).": "Overwhelm 額外層數的基礎傷害改為 4/5/6/7(隨 Golden Eclipse 的等級變化)。",
+  "Overwhelm additional stack base damage changed to 4/5/6/7(隨 Golden Eclipse's rank 變化).": "奪目每額外一層的基礎傷害改為 4/5/6/7(隨 Golden Eclipse 的等級變化)。",
   "Packmate attack damage bonus AD ratio changed to 6% of Naafiri's bonus AD.": "狼群夥伴的攻擊力額外 AD 係數改為 Naafiri 額外 AD 的 6%。",
   "Passive damage to plants changed to 2.": "被動對植物的傷害改為 2。",
   "Percentage of core stats stolen changed to 8%.": "竊取核心屬性的比例改為 8%。",
